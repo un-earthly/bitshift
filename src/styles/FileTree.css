@@ -1,0 +1,31 @@
+.file-tree {
+    list-style-type: none;
+    padding-left: 0;
+    margin: 0;
+  }
+  
+  .file-tree-item {
+    cursor: pointer;
+    padding: 4px 8px;
+    user-select: none;
+  }
+  
+  .file-tree-item.file:hover {
+    background-color: #e0e0e0;
+  }
+  
+  .file-tree-item.folder {
+    font-weight: bold;
+    cursor: default;
+  }
+  
+  .file-tree-item.folder:hover {
+    background-color: transparent;
+  }
+  .folder-toggle {
+    font-size: 12px;
+    display: inline-block;
+    width: 14px;
+    text-align: center;
+  }
+    
