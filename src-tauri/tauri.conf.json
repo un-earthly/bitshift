@@ -14,7 +14,8 @@
       {
         "title": "bitshift",
         "width": 800,
-        "height": 600
+        "height": 600,
+        "label": "main"
       }
     ],
     "security": {
@@ -35,6 +36,9 @@
   "plugins": {
     "fs": {
       "requireLiteralLeadingDot": false
+    },
+    "window": {
+      "additionalWindows": true
     }
   }
 }

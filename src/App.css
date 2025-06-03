@@ -3,42 +3,57 @@
 .app-container {
   display: flex;
   height: 100vh;
-  font-family: Arial, sans-serif;
+  background-color: #1e1e1e;
+  color: #fff;
 }
 
 .sidebar {
-  width: 25%;
-  border-right: 1px solid #ddd;
-  padding: 10px;
-  box-sizing: border-box;
-  overflow-y: auto;
-  background-color: #f9f9f9;
-}
-
-.open-folder-btn {
-  margin-bottom: 10px;
-  padding: 6px 12px;
-  background-color: #007bff;
-  color: white;
-  border: none;
-  border-radius: 3px;
-  cursor: pointer;
-  font-size: 14px;
-}
-
-.open-folder-btn:hover {
-  background-color: #0056b3;
+  width: 250px;
+  background-color: #252525;
+  border-right: 1px solid #333;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .editor-area {
   flex: 1;
-  padding: 10px;
-  box-sizing: border-box;
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
 }
 
 .placeholder-text {
-  color: #999;
-  font-size: 16px;
-  user-select: none;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  color: #666;
+  font-size: 1.2rem;
+}
+
+.open-folder-btn {
+  margin: 1rem;
+  padding: 0.5rem;
+  background-color: #0078d4;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.open-folder-btn:hover {
+  background-color: #0086ef;
+}
+
+/* Hide the chat sidebar when detached */
+.chat-sidebar.detached {
+  display: none;
+}
+
+/* Show the detached chat sidebar via its fixed positioning */
+.chat-sidebar.detached {
+  display: flex !important;
 }

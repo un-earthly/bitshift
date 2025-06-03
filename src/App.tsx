@@ -1,6 +1,7 @@
 import React from 'react';
 import FileTree from './components/FileTree';
 import EditorView from './components/EditorView';
+import ChatSidebar from './components/ChatSidebar';
 import {useFileSystem} from './hooks/useFileSystem';
 import { open } from '@tauri-apps/plugin-dialog';
 import './App.css'; 
@@ -8,7 +9,6 @@ import './App.css';
 const App: React.FC = () => {
   const {
     tree,
-    openFiles,
     activeFile,
     loadFolder,
     openFile,
@@ -56,6 +56,7 @@ const App: React.FC = () => {
           </div>
         )}
       </div>
+      <ChatSidebar />
     </div>
   );
 };
