@@ -1,9 +1,9 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import FileTree from './components/FileTree';
 import EditorView from './components/EditorView';
-import useFileSystem from './hooks/useFileSystem';
+import {useFileSystem} from './hooks/useFileSystem';
 import { open } from '@tauri-apps/plugin-dialog';
-import './App.css'; // Import the CSS file
+import './App.css'; 
 
 const App: React.FC = () => {
   const {
@@ -13,33 +13,40 @@ const App: React.FC = () => {
     loadFolder,
     openFile,
     updateFileContent,
-    setActivePath
+    toggleFolder,
   } = useFileSystem();
 
-  useEffect(() => {
-    loadFolder('/home/normod/projects');
-  }, []);
+  const handleOpenFolder = async () => {
+    try {
+      const selected = await open({
+        directory: true,
+        multiple: false,
+      });
+      console.log(selected);
+      if (selected && typeof selected === 'string') {
+        await loadFolder(selected);
+      }
+    } catch (err) {
+      console.error('Failed to open folder:', err);
+    }
+  };
 
   return (
     <div className="app-container">
       <div className="sidebar">
-        <button
-          onClick={async () => {
-            const selected = await open({ directory: true });
-            if (typeof selected === 'string') {
-              loadFolder(selected);
-            }
-          }}
-          className="open-folder-btn"
-        >
+        <button onClick={handleOpenFolder} className="open-folder-btn">
           Open Folder
         </button>
-        <FileTree nodes={tree} onFileClick={openFile} />
+        <FileTree 
+          nodes={tree} 
+          onFileClick={openFile}
+          onFolderClick={toggleFolder}
+        />
       </div>
       <div className="editor-area">
         {activeFile ? (
           <EditorView
-            filePath={activeFile.path}            
+            filePath={activeFile.path}
             content={activeFile.content}
             onChange={updateFileContent}
           />

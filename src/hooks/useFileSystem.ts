@@ -1,58 +1,82 @@
 import { useState } from 'react';
-import { readDir, BaseDirectory } from '@tauri-apps/plugin-fs';
+import { readTextFile } from '@tauri-apps/plugin-fs';
+import { invoke } from '@tauri-apps/api/core';
 
-interface Node {
+// Match the Rust struct exactly
+interface FileMetadata {
   name: string;
   path: string;
-  isDir: boolean;
-  children?: Node[];
+  is_dir: boolean;
+  size: number;
+  modified: number;
+  children?: FileMetadata[];
 }
 
-const useFileSystem = () => {
-  const [tree, setTree] = useState<Node[]>([]);
+// Extended interface for UI state
+interface FileNode extends FileMetadata {
+  isExpanded?: boolean;
+}
+
+export const useFileSystem = () => {
+  const [tree, setTree] = useState<FileNode[]>([]);
   const [openFiles, setOpenFiles] = useState<{ path: string; content: string }[]>([]);
   const [activePath, setActivePath] = useState<string | null>(null);
 
-  // Recursive folder reading function
-  const readFolderRecursive = (folderPath: string): Node[] => {
-    let nodes: Node[] = [];
+  const readFolder = async (path: string, depth: number = 1): Promise<FileNode[]> => {
     try {
-      const items = readDir(folderPath);
-      for (const item of items) {
-        const itemPath = path.join(folderPath, item);
-        const stat = fs.statSync(itemPath);
-        if (stat.isDirectory()) {
-          nodes.push({
-            name: item,
-            path: itemPath,
-            isDir: true,
-            children: readFolderRecursive(itemPath),
-          });
-        } else {
-          nodes.push({
-            name: item,
-            path: itemPath,
-            isDir: false,
-          });
-        }
-      }
+        const entries = await invoke<FileMetadata[]>('read_dir_metadata', { path, depth });
+        console.log("Received metadata:", entries);
+        const convertToFileNode = (entry: FileMetadata): FileNode => ({
+            ...entry,
+            isExpanded: false,
+            children: entry.children?.map(convertToFileNode)
+        });
+        return entries.map(convertToFileNode);
     } catch (err) {
-      console.error('Error reading folder', folderPath, err);
+        console.error('Error reading folder:', path, err);
+        return [];
     }
-    return nodes;
-  };
+};
 
-  const loadFolder = (folderPath: string) => {
-    const treeData = readFolderRecursive(folderPath);
-    setTree(treeData);
+  const loadFolder = async (rootPath: string) => {
+    const rootNodes = await readFolder(rootPath, 2);
+    setTree(rootNodes);
     setActivePath(null);
     setOpenFiles([]);
   };
 
-  const openFile = (filePath: string) => {
+  const toggleFolder = async (path: string) => {
+    const updateTree = async (nodes: FileNode[]): Promise<FileNode[]> => {
+      return Promise.all(nodes.map(async (node) => {
+        if (node.path === path) {
+          if (node.isExpanded) {
+            // Just collapse the folder
+            return { ...node, isExpanded: false };
+          } else {
+            // Load children when expanding
+            const children = await readFolder(node.path);
+            return { ...node, isExpanded: true, children };
+          }
+        } else if (node.children) {
+          return {
+            ...node,
+            children: await updateTree(node.children),
+          };
+        }
+        return node;
+      }));
+    };
+
+    const newTree = await updateTree(tree);
+    setTree(newTree);
+  };
+
+  const openFile = async (filePath: string) => {
     try {
-      const content = fs.readFileSync(filePath, 'utf-8');
-      setOpenFiles([{ path: filePath, content }]);
+      const content = await readTextFile(filePath);
+      if (!openFiles.some(f => f.path === filePath)) {
+        setOpenFiles(prev => [...prev, { path: filePath, content }]);
+      }
       setActivePath(filePath);
     } catch (err) {
       console.error('Failed to open file:', filePath, err);
@@ -67,15 +91,22 @@ const useFileSystem = () => {
     );
   };
 
+  const closeFile = (filePath: string) => {
+    setOpenFiles(files => files.filter(f => f.path !== filePath));
+    if (activePath === filePath) {
+      setActivePath(null);
+    }
+  };
+
   return {
     tree,
     openFiles,
     activeFile: openFiles.find(f => f.path === activePath) || null,
     loadFolder,
     openFile,
+    closeFile,
     updateFileContent,
     setActivePath,
+    toggleFolder,
   };
 };
-
-export default useFileSystem;
