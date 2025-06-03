@@ -1,0 +1,155 @@
+.chat-sidebar {
+  width: 300px;
+  height: 100%;
+  border-left: 1px solid #2d2d2d;
+  background: #1e1e1e;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.3s ease;
+}
+
+.chat-window {
+  width: 100%;
+  height: 100vh;
+  background: #1e1e1e;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-header {
+  padding: 16px;
+  background: #252526;
+  border-bottom: 1px solid #2d2d2d;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.chat-header h3 {
+  margin: 0;
+  color: #e0e0e0;
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.chat-header button {
+  background: #2d2d2d;
+  border: 1px solid #3d3d3d;
+  color: #e0e0e0;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+}
+
+.chat-header button:hover {
+  background: #3d3d3d;
+  border-color: #4d4d4d;
+}
+
+.messages-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.messages-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.messages-container::-webkit-scrollbar-track {
+  background: #1e1e1e;
+}
+
+.messages-container::-webkit-scrollbar-thumb {
+  background: #3d3d3d;
+  border-radius: 4px;
+}
+
+.message {
+  max-width: 85%;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+.message.user {
+  align-self: flex-end;
+  background: #2b5797;
+  color: #ffffff;
+}
+
+.message.assistant {
+  align-self: flex-start;
+  background: #2d2d2d;
+  color: #e0e0e0;
+}
+
+.message-content {
+  word-break: break-word;
+}
+
+.input-container {
+  padding: 16px;
+  background: #252526;
+  border-top: 1px solid #2d2d2d;
+  display: flex;
+  gap: 8px;
+}
+
+.input-container input {
+  flex: 1;
+  background: #3d3d3d;
+  border: 1px solid #4d4d4d;
+  color: #e0e0e0;
+  padding: 10px 16px;
+  border-radius: 4px;
+  font-size: 0.9375rem;
+  transition: all 0.2s ease;
+}
+
+.input-container input:focus {
+  outline: none;
+  border-color: #0078d4;
+  background: #333333;
+}
+
+.input-container input::placeholder {
+  color: #808080;
+}
+
+.input-container button {
+  background: #0078d4;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  font-size: 0.9375rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.input-container button:hover {
+  background: #106ebe;
+}
+
+/* Animation for messages */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.message {
+  animation: slideIn 0.2s ease-out;
+} 

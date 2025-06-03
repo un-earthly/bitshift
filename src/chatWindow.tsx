@@ -3,10 +3,10 @@ import ReactDOM from 'react-dom/client';
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import './styles/ChatSidebar.css';
 import { Message } from './hooks/useChatState';
+import Chat from './components/Chat';
 
 const ChatWindow: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState('');
 
   useEffect(() => {
     const webview = getCurrentWebview();
@@ -21,19 +21,10 @@ const ChatWindow: React.FC = () => {
     };
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim()) return;
+  const handleSendMessage = async (message: Message) => {
+    setMessages(prev => [...prev, message]);
 
-    const newMessage: Message = {
-      role: 'user',
-      content: input.trim()
-    };
-
-    setMessages(prev => [...prev, newMessage]);
-    setInput('');
-
-    // TODO: Implement actual chat functionality
+    // Mock response
     setTimeout(() => {
       const response: Message = {
         role: 'assistant',
@@ -44,27 +35,11 @@ const ChatWindow: React.FC = () => {
   };
 
   return (
-    <div className="chat-window">
-      <div className="chat-header">
-        <h3>Chat</h3>
-      </div>
-      <div className="messages-container">
-        {messages.map((msg, i) => (
-          <div key={i} className={`message ${msg.role}`}>
-            <div className="message-content">{msg.content}</div>
-          </div>
-        ))}
-      </div>
-      <form onSubmit={handleSubmit} className="input-container">
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Type a message..."
-        />
-        <button type="submit">Send</button>
-      </form>
-    </div>
+    <Chat
+      messages={messages}
+      onSendMessage={handleSendMessage}
+      isDetached={true}
+    />
   );
 };
 

@@ -11,6 +11,8 @@
     "dialog:default",
     "fs:default",
     "core:webview:allow-create-webview-window",
-    "core:window:allow-close"
+    "core:window:allow-close",
+    "core:event:allow-listen",    
+    "core:event:allow-unlisten"
   ]
 }
