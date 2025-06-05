@@ -1,85 +1,170 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useRef, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
+import { useLlamaChat } from '../hooks/useChatState';
 import '../styles/Chat.css';
-import { Message } from '../hooks/useChatState';
 
-interface ChatProps {
-  messages: Message[];
-  onSendMessage: (message: Message) => void;
-  isDetached?: boolean;
-  onDetach?: () => void;
-}
+// Progress Bar Component
+const ProgressBar = ({ progress }: { progress: number }) => (
+  <div className="progress-bar-container">
+    <div 
+      className="progress-bar-fill" 
+      style={{ width: `${progress}%` }}
+    />
+  </div>
+);
 
-const Chat: React.FC<ChatProps> = ({ 
-  messages, 
-  onSendMessage, 
-  isDetached = false, 
-  onDetach 
-}) => {
-  const [input, setInput] = useState('');
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+// Loading Indicator Component
+const LoadingIndicator = () => (
+  <div className="loading-indicator" />
+);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+const LlamaChat = () => {
+  const {
+    conversation,
+    userInput,
+    setUserInput,
+    isLoading,
+    progress,
+    isDownloading,
+    availableModels,
+    selectedModel,
+    isGenerating,
+    autoScrollEnabled,
+    handleModelSelection,
+    handleSendMessage,
+    stopGeneration,
+    handleScroll,
+    downloadModel,
+    cancelDownload,
+  } = useLlamaChat();
+
+  const scrollViewRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    if (autoScrollEnabled && scrollViewRef.current) {
+      const element = scrollViewRef.current;
+      element.scrollTop = element.scrollHeight;
+    }
+  }, [conversation, autoScrollEnabled]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim()) return;
-
-    const newMessage: Message = {
-      role: 'user',
-      content: input.trim()
-    };
-
-    onSendMessage(newMessage);
-    setInput('');
-    inputRef.current?.focus();
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSubmit(e);
+      handleSendMessage();
+    }
+  };
+  const handleModelChange = async (modelName: string) => {
+    const model = availableModels.find(m => m.name === modelName);
+    if (!model) return;
+
+    if (model.downloaded) {
+      handleModelSelection(model);
+    } else {
+      console.log(`Model ${model.name} is not downloaded. Size: ${model.size}`);
+      const confirmed = window.confirm(
+        `Do you want to download ${model.name}? Size: ${model.size}`
+      );
+      if (confirmed) {
+        console.log(`Starting download of ${model.name} from ${model.url}`);
+        try {
+          await downloadModel(model);
+          console.log(`Successfully downloaded ${model.name}`);
+          handleModelSelection(model);
+        } catch (error) {
+          console.error(`Failed to download ${model.name}:`, error);
+          return;
+        }
+      } else {
+        console.log(`Download cancelled for ${model.name}`);
+        return;
+      }
     }
   };
 
   return (
-    <div className={isDetached ? "chat-window" : "chat-sidebar"}>
+    <div className="container">
       <div className="chat-header">
-        <h3>Chat</h3>
-        {!isDetached && onDetach && (
-          <button onClick={onDetach}>
-            <span>Detach</span>
-          </button>
-        )}
+        <h1 className="title">Llama Chat</h1>
+        <div className="model-selector">
+          <select 
+            value={selectedModel?.name || ''} 
+            onChange={(e) => handleModelChange(e.target.value)}
+            disabled={isDownloading || isGenerating}
+          >
+            <option value="">Select a model</option>
+            {availableModels.map((model) => (
+              <option 
+                key={model.name} 
+                value={model.name}
+              >
+                {model.name} {model.downloaded ? '(Downloaded)' : `(${model.size})`}
+              </option>
+            ))}
+          </select>
+          {isDownloading && (
+            <div className="download-status">
+              <ProgressBar progress={progress} />
+              <div className="download-text">
+                Downloading: {progress}%
+                <button 
+                  onClick={cancelDownload}
+                  className="cancel-button"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
-      <div className="messages-container">
-        {messages.map((msg, i) => (
-          <div key={i} className={`message ${msg.role}`}>
-            <div className="message-content">{msg.content}</div>
-          </div>
-        ))}
-        <div ref={messagesEndRef} />
+
+      <div className="chat-body">
+        <div 
+          className="messages-container" 
+          ref={scrollViewRef}
+          onScroll={handleScroll}
+        >
+          {conversation.map((msg, index) => (
+            <div 
+              key={index} 
+              className={`message ${msg.role === 'user' ? 'user-message' : 'assistant-message'}`}
+            >
+              <ReactMarkdown>{msg.content}</ReactMarkdown>
+            </div>
+          ))}
+          {isLoading && <LoadingIndicator />}
+        </div>
+
+        <div className="input-container">
+          <input
+            type="text"
+            className="chat-input"
+            placeholder="Type your message..."
+            value={userInput}
+            onChange={(e) => setUserInput(e.target.value)}
+            onKeyPress={handleKeyPress}
+            disabled={!selectedModel || isLoading}
+          />
+          {isGenerating ? (
+            <button
+              className="stop-button"
+              onClick={stopGeneration}
+            >
+              Stop
+            </button>
+          ) : (
+            <button
+              className="send-button"
+              onClick={handleSendMessage}
+              disabled={!selectedModel || isLoading}
+            >
+              Send
+            </button>
+          )}
+        </div>
       </div>
-      <form onSubmit={handleSubmit} className="input-container">
-        <input
-          ref={inputRef}
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyPress={handleKeyPress}
-          placeholder="Type your message..."
-          autoFocus
-        />
-        <button type="submit">Send</button>
-      </form>
     </div>
   );
 };
 
-export default Chat; 
+export default LlamaChat;

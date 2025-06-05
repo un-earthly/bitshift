@@ -1,0 +1,122 @@
+.model-selector {
+  padding: 16px;
+  color: #e0e0e0;
+}
+
+.model-selector h3 {
+  margin: 0 0 16px 0;
+  font-size: 1.1rem;
+  font-weight: 500;
+}
+
+.models-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.model-card {
+  background: #252526;
+  border: 1px solid #2d2d2d;
+  border-radius: 8px;
+  padding: 16px;
+  transition: all 0.2s ease;
+}
+
+.model-card:hover {
+  border-color: #3d3d3d;
+}
+
+.model-card.downloaded {
+  border-color: #0f4a26;
+}
+
+.model-card.selected {
+  border-color: #0078d4;
+  background: #1c1c1c;
+}
+
+.model-info h4 {
+  margin: 0 0 8px 0;
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.model-info p {
+  margin: 0 0 12px 0;
+  font-size: 0.875rem;
+  color: #808080;
+  line-height: 1.4;
+}
+
+.model-meta {
+  display: flex;
+  gap: 16px;
+  font-size: 0.75rem;
+  color: #808080;
+  margin-bottom: 16px;
+}
+
+.model-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.model-actions button {
+  background: #2d2d2d;
+  border: 1px solid #3d3d3d;
+  color: #e0e0e0;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+  min-width: 100px;
+}
+
+.model-actions button:hover:not(:disabled) {
+  background: #3d3d3d;
+  border-color: #4d4d4d;
+}
+
+.model-actions button.selected {
+  background: #0078d4;
+  border-color: #0078d4;
+  color: white;
+}
+
+.model-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.model-actions button.downloading {
+  padding: 0;
+  overflow: hidden;
+  cursor: wait;
+}
+
+.download-progress {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+}
+
+.progress-bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  background: #0078d4;
+  opacity: 0.2;
+  transition: width 0.3s ease;
+}
+
+.download-progress span {
+  position: relative;
+  z-index: 1;
+} 

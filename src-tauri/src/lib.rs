@@ -1,9 +1,9 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 use serde::{Deserialize, Serialize};
-use std::{fs, path::PathBuf};
 use std::time::SystemTime;
+use std::{fs, path::PathBuf};
+use tauri::Manager;
 use tauri_plugin_fs::FsExt;
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FileMetadata {
     name: String,
@@ -29,7 +29,11 @@ impl FileMetadata {
                 // println!("Path: {}, is_dir: {}", path.display(), metadata.is_dir());
 
                 Ok(FileMetadata {
-                    name: path.file_name().unwrap_or_default().to_string_lossy().into(),
+                    name: path
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                        .into(),
                     path: path.to_string_lossy().into(),
                     is_dir: metadata.is_dir(),
                     size: metadata.len(),
@@ -71,12 +75,10 @@ fn read_dir_recursive(path: PathBuf, depth: u32) -> std::io::Result<Vec<FileMeta
         entries.push(metadata);
     }
 
-    entries.sort_by(|a, b| {
-        match (a.is_dir, b.is_dir) {
-            (true, false) => std::cmp::Ordering::Less,
-            (false, true) => std::cmp::Ordering::Greater,
-            _ => a.name.cmp(&b.name),
-        }
+    entries.sort_by(|a, b| match (a.is_dir, b.is_dir) {
+        (true, false) => std::cmp::Ordering::Less,
+        (false, true) => std::cmp::Ordering::Greater,
+        _ => a.name.cmp(&b.name),
     });
 
     Ok(entries)
@@ -90,14 +92,35 @@ async fn read_file_metadata(path: String) -> Result<FileMetadata, String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
+            let app_data_dir = app
+                .path()
+                .app_data_dir()
+                .expect("Failed to get app data directory");
+            let models_dir = app_data_dir.join("models");
+
+            // Create models directory if it doesn't exist
+            if !models_dir.exists() {
+                std::fs::create_dir_all(&models_dir).expect("Failed to create models directory");
+            }
+
+            let fs_scope = app.fs_scope();
+
+            // Allow access to models directory
+            fs_scope
+                .allow_directory(&models_dir, true)
+                .expect("Failed to allow models directory access");
+
             #[cfg(debug_assertions)]
             {
-                let fs_scope = app.fs_scope();
-                fs_scope.allow_directory("/", true).expect("Failed to allow full file system access");
+                fs_scope
+                    .allow_directory("/", true)
+                    .expect("Failed to allow full file system access");
             }
             Ok(())
         })

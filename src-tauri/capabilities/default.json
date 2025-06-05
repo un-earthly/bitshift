@@ -3,7 +3,8 @@
   "identifier": "default",
   "description": "Capability for the main window",
   "windows": [
-    "main"
+    "main",
+    "chat"
   ],
   "permissions": [
     "core:default",
@@ -12,7 +13,31 @@
     "fs:default",
     "core:webview:allow-create-webview-window",
     "core:window:allow-close",
-    "core:event:allow-listen",    
-    "core:event:allow-unlisten"
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+    "http:default",
+    "dialog:allow-confirm",
+    "fs:allow-read",
+    "fs:allow-write",
+    "fs:allow-create",
+    "fs:allow-rename",
+    "fs:allow-app-write",
+    "fs:allow-app-write-recursive",
+    "fs:allow-appdata-write",
+    "fs:allow-appdata-write-recursive",
+    "fs:allow-applocaldata-write",
+    "fs:allow-applocaldata-write-recursive",
+    "fs:write-all",
+    "shell:default",
+    
+    {
+      "identifier": "shell:allow-spawn",
+      "allow": [
+        {
+          "name": "binaries/llama",
+          "sidecar": true
+        }
+      ]
+    }
   ]
 }
