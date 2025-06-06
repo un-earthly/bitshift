@@ -1,13 +1,14 @@
-import React from 'react';
-import LlamaChat from './LlamaChat';
+import { LlamaChat } from './LlamaChat';
 import './../styles/Chat.css';
 
-const ChatSidebar: React.FC = () => {
-  return (
-    <div className="chat-sidebar-container">
-      <LlamaChat />
-    </div>
-  );
-};
+interface ChatSidebarProps {
+    onDetach: () => void;
+}
 
-export default ChatSidebar; 
+export const ChatSidebar: React.FC<ChatSidebarProps> = ({ onDetach }) => {
+    return (
+        <div className="chat-sidebar">
+            <LlamaChat showHeader={true} onDetach={onDetach} />
+        </div>
+    );
+}; 

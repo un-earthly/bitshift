@@ -29,6 +29,7 @@
     "fs:allow-applocaldata-write-recursive",
     "fs:write-all",
     "shell:default",
+    "core:window:allow-destroy",
     {
       "identifier": "shell:allow-spawn",
       "allow": [
@@ -373,8 +374,6 @@
           "sidecar": true
         }
       ]
-    },
-    "fs:default",
-    "shell:default"
+    }
   ]
 }

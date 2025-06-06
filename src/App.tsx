@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Panel,
   PanelGroup,
@@ -6,12 +6,15 @@ import {
 } from "react-resizable-panels";
 import FileTree from './components/FileTree';
 import EditorView from './components/EditorView';
-import ChatSidebar from './components/ChatSidebar';
+import {ChatSidebar} from './components/ChatSidebar';
 import {useFileSystem} from './hooks/useFileSystem';
 import { open } from '@tauri-apps/plugin-dialog';
+import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import './App.css'; 
 
 const App: React.FC = () => {
+  const [isChatVisible, setIsChatVisible] = useState(true);
+
   const {
     tree,
     activeFile,
@@ -20,6 +23,16 @@ const App: React.FC = () => {
     updateFileContent,
     toggleFolder,
   } = useFileSystem();
+
+  useEffect(() => {
+    const checkDetachedWindow = async () => {
+      const chatWindow = await WebviewWindow.getByLabel("chat");
+      if (chatWindow) {
+        setIsChatVisible(false);
+      }
+    };
+    checkDetachedWindow();
+  }, []);
 
   const handleOpenFolder = async () => {
     try {
@@ -34,6 +47,32 @@ const App: React.FC = () => {
     } catch (err) {
       console.error('Failed to open folder:', err);
     }
+  };
+
+  const handleDetach = async () => {
+    // Hide the sidebar immediately
+    setIsChatVisible(false);
+
+    // Create the new window
+    const chatWindow = new WebviewWindow("chat", {
+      url: "chat.html",
+      title: "Chat",
+      width: 400,
+      height: 600,
+    });
+    
+    // Listen for the detached window to be closed
+    const unlisten = await chatWindow.onCloseRequested(async () => {
+      // When it's closed, show the sidebar again
+      setIsChatVisible(true);
+      unlisten();
+    });
+
+    chatWindow.once("tauri://error", (e) => {
+      console.error("Failed to create chat window:", e);
+      // If the window fails to open, show the sidebar again
+      setIsChatVisible(true);
+    });
   };
 
   return (
@@ -67,10 +106,14 @@ const App: React.FC = () => {
             )}
           </div>
         </Panel>
-        <PanelResizeHandle />
-        <Panel defaultSize={30} minSize={20}>
-          <ChatSidebar />
-        </Panel>
+        {isChatVisible && (
+          <>
+            <PanelResizeHandle />
+            <Panel defaultSize={30} minSize={20}>
+              <ChatSidebar onDetach={handleDetach} />
+            </Panel>
+          </>
+        )}
       </PanelGroup>
     </div>
   );
