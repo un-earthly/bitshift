@@ -11,9 +11,12 @@ import {useFileSystem} from './hooks/useFileSystem';
 import { open } from '@tauri-apps/plugin-dialog';
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import './App.css'; 
+import { Button } from './components/ui/button';
+import { useTheme } from './components/theme-provider';
 
 const App: React.FC = () => {
   const [isChatVisible, setIsChatVisible] = useState(true);
+  const { theme, setTheme } = useTheme();
 
   const {
     tree,
@@ -75,24 +78,59 @@ const App: React.FC = () => {
     });
   };
 
+  const toggleTheme = () => {
+    setTheme(theme === 'light' ? 'dark' : 'light');
+  };
+
   return (
-    <div className="app-container">
-      <PanelGroup direction="horizontal">
-        <Panel defaultSize={20} minSize={10}>
-          <div className="sidebar">
-            <button onClick={handleOpenFolder} className="open-folder-btn">
-              Open Folder
-            </button>
-            <FileTree 
-              nodes={tree} 
-              onFileClick={openFile}
-              onFolderClick={toggleFolder}
-            />
+    <div className="h-screen w-screen overflow-hidden bg-background">
+      <PanelGroup 
+        direction="horizontal" 
+        className="h-full"
+      >
+        <Panel 
+          defaultSize={20} 
+          minSize={10}
+          className="border-r border-border/40"
+        >
+          <div className="flex h-full flex-col bg-muted/40">
+            <div className="flex flex-col gap-2 p-4 border-b border-border/40">
+              <div className="flex items-center justify-between">
+                <Button 
+                  onClick={handleOpenFolder} 
+                  variant="outline"
+                  className="flex-1"
+                >
+                  Open Folder
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={toggleTheme}
+                  className="ml-2"
+                >
+                  {theme === 'light' ? '🌙' : '☀️'}
+                </Button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-auto p-2">
+              <FileTree 
+                nodes={tree} 
+                onFileClick={openFile}
+                onFolderClick={toggleFolder}
+              />
+            </div>
           </div>
         </Panel>
-        <PanelResizeHandle />
-        <Panel defaultSize={50} minSize={30}>
-          <div className="editor-area">
+
+        <PanelResizeHandle className="w-2 bg-border/40 hover:bg-border/60 transition-colors" />
+
+        <Panel 
+          defaultSize={50} 
+          minSize={30}
+          className="bg-background"
+        >
+          <div className="h-full">
             {activeFile ? (
               <EditorView
                 filePath={activeFile.path}
@@ -100,16 +138,21 @@ const App: React.FC = () => {
                 onChange={updateFileContent}
               />
             ) : (
-              <div className="placeholder-text">
+              <div className="flex h-full items-center justify-center text-muted-foreground">
                 Open a file to start editing
               </div>
             )}
           </div>
         </Panel>
+
         {isChatVisible && (
           <>
-            <PanelResizeHandle />
-            <Panel defaultSize={30} minSize={20}>
+            <PanelResizeHandle className="w-2 bg-border/40 hover:bg-border/60 transition-colors" />
+            <Panel 
+              defaultSize={30} 
+              minSize={20}
+              className="border-l border-border/40"
+            >
               <ChatSidebar onDetach={handleDetach} />
             </Panel>
           </>

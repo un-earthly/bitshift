@@ -211,11 +211,6 @@ useChatStoreImpl.subscribe((state) => {
   emit('state-changed', { state, from: windowId });
 });
 
-// 3. Set up the listener when the module loads
-let unlisten: Promise<UnlistenFn> | null = null;
-if (typeof window !== 'undefined') {
-  unlisten = setupEventListener();
-}
 
 // Export the hook
 export const useChatStore = useChatStoreImpl; 

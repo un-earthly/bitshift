@@ -1,22 +1,37 @@
-import { useRef, useEffect, useState, KeyboardEvent } from "react";
-import ReactMarkdown from "react-markdown";
-import { useChatState } from "../hooks/useChatState";
-import "../styles/Chat.css";
+import React, { useRef, useEffect } from 'react';
+import { cn } from '../lib/utils';
+import { Button } from './ui/button';
+import { Textarea } from './ui/textarea';
+import { ScrollArea } from './ui/scroll-area';
+import { useChatState } from '../hooks/useChatState';
+import ReactMarkdown from 'react-markdown';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
 
 const ProgressBar = ({ progress }: { progress: number }) => (
-  <div className="progress-bar-container">
-    <div className="progress-bar" style={{ width: `${progress}%` }}></div>
+  <div className="h-1 w-full overflow-hidden rounded-full bg-muted">
+    <div 
+      className="h-full bg-primary transition-all duration-500" 
+      style={{ width: `${progress}%` }} 
+    />
   </div>
 );
 
 interface LlamaChatProps {
   showHeader?: boolean;
   onDetach?: () => void;
+  maxMessageLength?: number;
 }
 
 export const LlamaChat: React.FC<LlamaChatProps> = ({
   showHeader = true,
   onDetach,
+  maxMessageLength = 2000,
 }) => {
   const {
     conversation,
@@ -34,110 +49,216 @@ export const LlamaChat: React.FC<LlamaChatProps> = ({
     availableModels,
   } = useChatState();
 
-  const contentRef = useRef<HTMLDivElement>(null);
-  const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (autoScrollEnabled && contentRef.current) {
-      contentRef.current.scrollTop = contentRef.current.scrollHeight;
-    }
-  }, [conversation, autoScrollEnabled]);
-
-  const handleScroll = () => {
-    if (contentRef.current) {
-      const { scrollTop, scrollHeight, clientHeight } = contentRef.current;
-      const atBottom = scrollHeight - scrollTop <= clientHeight + 1;
-      setAutoScrollEnabled(atBottom);
-    }
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const handleKeyPress = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
+  useEffect(() => {
+    scrollToBottom();
+  }, [conversation]);
+
+  const validateInput = (text: string) => {
+    if (!text.trim()) {
+      return 'Message cannot be empty';
+    }
+    if (text.length > maxMessageLength) {
+      return `Message is too long (max ${maxMessageLength} characters)`;
+    }
+    if (!selectedModel) {
+      return 'Please select a model first';
+    }
+    return null;
+  };
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const validationError = validateInput(userInput);
+    
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    if (!isGenerating) {
+      setError(null);
       handleSendMessage();
     }
   };
 
-  const handleModelChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const modelName = e.target.value;
-    const model = availableModels.find((m) => m.name === modelName);
-    if (model) {
-      handleModelSelection(model);
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newValue = e.target.value;
+    setUserInput(newValue);
+    
+    if (error) {
+      setError(null);
+    }
+
+    if (newValue.length > maxMessageLength) {
+      setError(`Message is too long (max ${maxMessageLength} characters)`);
     }
   };
 
   return (
-    <div className="chat-container">
+    <div className="flex h-full flex-col overflow-hidden bg-background">
       {showHeader && (
-        <div className="chat-header">
-          <h2>Llama Chat</h2>
-          {onDetach && (
-            <button onClick={onDetach} className="detach-button">
-              Detach
-            </button>
-          )}
+        <div className="flex-none border-b border-border/40 bg-muted/40 p-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold">LLaMA Chat</h2>
+            {onDetach && (
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={onDetach}
+              >
+                Detach
+              </Button>
+            )}
+          </div>
+          
+          <div className="mt-4 space-y-4">
+            <Select
+              value={selectedModel?.name || ""}
+              onValueChange={(value) => {
+                const model = availableModels.find(m => m.name === value);
+                if (model) {
+                  handleModelSelection(model);
+                  setError(null);
+                }
+              }}
+              disabled={isDownloading || isGenerating}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select a model" />
+              </SelectTrigger>
+              <SelectContent>
+                {isFetching ? (
+                  <SelectItem value="loading" disabled>
+                    Fetching models...
+                  </SelectItem>
+                ) : (
+                  availableModels.map((model) => (
+                    <SelectItem key={model.id} value={model.name}>
+                      {model.name} {model.downloaded ? "(Downloaded)" : `(${model.size})`}
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+
+            {isDownloading && (
+              <div className="space-y-2">
+                <ProgressBar progress={progress} />
+                <p className="text-sm text-muted-foreground">
+                  Downloading: {progress}%
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
-      <div className="model-selector-container">
-        <select
-          onChange={handleModelChange}
-          value={selectedModel?.name || ""}
-          disabled={isDownloading || isGenerating}
-        >
-          <option value="" disabled>
-            Select a model
-          </option>
-          {isFetching ? (
-            <option value="loading" disabled>
-              Fetching models...
-            </option>
+      <div className="flex-1 overflow-auto">
+        <div className="h-full space-y-4 p-4">
+          {conversation.length <= 1 ? (
+            <div className="flex h-32 items-center justify-center text-muted-foreground">
+              <p>Select a model and start chatting!</p>
+            </div>
           ) : (
-            availableModels.map((model) => (
-              <option key={model.id} value={model.name}>
-                {model.name}{" "}
-                {model.downloaded ? "(Downloaded)" : `(${model.size})`}
-              </option>
+            conversation.slice(1).map((message, index) => (
+              <div
+                key={index}
+                className={cn(
+                  "flex w-full",
+                  message.role === 'user' ? "justify-end" : "justify-start"
+                )}
+              >
+                <div
+                  className={cn(
+                    "flex max-w-[80%] items-start gap-3 rounded-lg px-4 py-2",
+                    message.role === 'user'
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted"
+                  )}
+                >
+                  <div className="min-w-[24px] pt-1">
+                    {message.role === 'user' ? '👤' : '🤖'}
+                  </div>
+                  <div className="flex-1 space-y-1">
+                    <div className="prose prose-sm dark:prose-invert max-w-none">
+                      <ReactMarkdown>
+                        {message.content || '*Empty message*'}
+                      </ReactMarkdown>
+                    </div>
+                  </div>
+                </div>
+              </div>
             ))
           )}
-        </select>
-        {isDownloading && (
-          <div className="download-status">
-            <ProgressBar progress={progress} />
-            <div className="download-text">Downloading: {progress}%</div>
-          </div>
-        )}
+          <div ref={messagesEndRef} />
+        </div>
       </div>
 
-      <div className="chat-messages" ref={contentRef} onScroll={handleScroll}>
-        {conversation.slice(1).map((msg, index) => (
-          <div key={index} className={`message ${msg.role}`}>
-            <ReactMarkdown>{msg.content}</ReactMarkdown>
+      <form
+        onSubmit={handleSubmit}
+        className="flex-none border-t border-border/50 bg-background/95 p-4 backdrop-blur supports-[backdrop-filter]:bg-background/60"
+      >
+        <div className="flex flex-col gap-2">
+          <div className="flex gap-2">
+            <Textarea
+              value={userInput}
+              onChange={handleInputChange}
+              placeholder={selectedModel ? "Type a message..." : "Select a model to start chatting"}
+              className={cn(
+                "min-h-[60px] max-h-[200px] flex-1 resize-none",
+                error && "border-destructive"
+              )}
+              onKeyDown={(e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSubmit(e as any);
+                }
+              }}
+              disabled={isGenerating || isDownloading || !selectedModel}
+              maxLength={maxMessageLength}
+              aria-invalid={error ? "true" : "false"}
+            />
+            {isGenerating ? (
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={stopGeneration}
+                className="self-end"
+              >
+                Stop
+              </Button>
+            ) : (
+              <Button
+                type="submit"
+                disabled={!userInput.trim() || isGenerating || Boolean(error) || !selectedModel}
+                className="self-end"
+              >
+                Send
+              </Button>
+            )}
           </div>
-        ))}
-      </div>
-
-      <div className="chat-input-area">
-        <textarea
-          value={userInput}
-          onChange={(e) => setUserInput(e.target.value)}
-          onKeyPress={handleKeyPress}
-          placeholder="Type your message..."
-          disabled={isGenerating || !selectedModel}
-        />
-        {isGenerating ? (
-          <button onClick={stopGeneration}>Stop</button>
-        ) : (
-          <button
-            onClick={handleSendMessage}
-            disabled={!userInput.trim() || !selectedModel}
-          >
-            Send
-          </button>
-        )}
-      </div>
+          {error && (
+            <p className="text-sm text-destructive" role="alert">
+              {error}
+            </p>
+          )}
+          <div className="flex justify-between text-xs text-muted-foreground">
+            <span>
+              {selectedModel ? `Using ${selectedModel.name}` : 'No model selected'}
+            </span>
+            <span>
+              {userInput.length}/{maxMessageLength}
+            </span>
+          </div>
+        </div>
+      </form>
     </div>
   );
 };
-
-export default LlamaChat;

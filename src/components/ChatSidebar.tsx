@@ -7,7 +7,7 @@ interface ChatSidebarProps {
 
 export const ChatSidebar: React.FC<ChatSidebarProps> = ({ onDetach }) => {
     return (
-        <div className="chat-sidebar">
+        <div className="w-full h-full">
             <LlamaChat showHeader={true} onDetach={onDetach} />
         </div>
     );
