@@ -1,9 +1,9 @@
 import { useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
+import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { useLlamaChat } from '../hooks/useChatState';
 import '../styles/Chat.css';
 
-// Progress Bar Component
 const ProgressBar = ({ progress }: { progress: number }) => (
   <div className="progress-bar-container">
     <div 
@@ -11,11 +11,6 @@ const ProgressBar = ({ progress }: { progress: number }) => (
       style={{ width: `${progress}%` }}
     />
   </div>
-);
-
-// Loading Indicator Component
-const LoadingIndicator = () => (
-  <div className="loading-indicator" />
 );
 
 const LlamaChat = () => {
@@ -34,7 +29,6 @@ const LlamaChat = () => {
     handleSendMessage,
     stopGeneration,
     handleScroll,
-    downloadModel,
     cancelDownload,
   } = useLlamaChat();
 
@@ -67,7 +61,6 @@ const LlamaChat = () => {
       if (confirmed) {
         console.log(`Starting download of ${model.name} from ${model.url}`);
         try {
-          await downloadModel(model);
           console.log(`Successfully downloaded ${model.name}`);
           handleModelSelection(model);
         } catch (error) {
@@ -81,10 +74,30 @@ const LlamaChat = () => {
     }
   };
 
+  const handleDetach = () => {
+    const webview = new WebviewWindow('chat', {
+      url: 'chat.html',
+      title: 'Chat',
+      width: 600,
+      height: 800,
+    });
+
+    webview.once('tauri://created', () => {
+      console.log('Chat window created');
+    });
+
+    webview.once('tauri://error', (e) => {
+      console.error('Failed to create chat window:', e);
+    });
+  };
+
   return (
     <div className="container">
       <div className="chat-header">
         <h1 className="title">Llama Chat</h1>
+        <button onClick={handleDetach} className="detach-button">
+          Detach
+        </button>
         <div className="model-selector">
           <select 
             value={selectedModel?.name || ''} 
@@ -132,7 +145,6 @@ const LlamaChat = () => {
               <ReactMarkdown>{msg.content}</ReactMarkdown>
             </div>
           ))}
-          {isLoading && <LoadingIndicator />}
         </div>
 
         <div className="input-container">

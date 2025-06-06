@@ -1,11 +1,12 @@
 import React from 'react';
-import Chat from './Chat';
+import LlamaChat from './LlamaChat';
+import './../styles/Chat.css';
 
 const ChatSidebar: React.FC = () => {
-
-
   return (
-    <Chat/>
+    <div className="chat-sidebar-container">
+      <LlamaChat />
+    </div>
   );
 };
 

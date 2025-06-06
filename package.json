@@ -7,8 +7,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "tauri": "tauri",
-    "commit": "cz"
+    "tauri": "tauri"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
@@ -18,14 +17,12 @@
     "@tauri-apps/plugin-http": "^2.4.4",
     "@tauri-apps/plugin-opener": "^2",
     "@tauri-apps/plugin-shell": "^2.2.1",
-    "commitizen": "^4.3.1",
-    "git-conventional-commits": "^2.8.0",
     "monaco-editor": "^0.52.2",
-    "node-llama-cpp": "^3.8.1",
-    "npm": "^11.4.1",
+    "node-llama-cpp": "^3.9.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-markdown": "^10.1.0"
+    "react-markdown": "^10.1.0",
+    "react-resizable-panels": "^3.0.2"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",

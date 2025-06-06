@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
-import axios from 'axios';
-import { llmService } from '../services/llm';
 import { modelManager } from '../services/modelManager';
+import { appLocalDataDir, join } from '@tauri-apps/api/path';
+import { llmService } from '../services/llmService';
 
 interface ModelInfo {
   id: string;
@@ -19,38 +19,6 @@ interface Message {
   thought?: string;
   showThought?: boolean;
 }
-
-interface LlamaConfig {
-  model: string;
-  use_mlock: boolean;
-  n_ctx: number;
-  n_gpu_layers: number;
-}
-
-interface CompletionParams {
-  messages: Message[];
-  n_predict: number;
-  stop: string[];
-}
-
-interface CompletionCallback {
-  token: string;
-}
-
-interface CompletionResult {
-  timings: {
-    predicted_per_second: number;
-  };
-}
-
-interface HuggingFaceFile {
-  rfilename: string;
-}
-
-interface HuggingFaceResponse {
-  siblings: HuggingFaceFile[];
-}
-
 export const useLlamaChat = () => {
   const INITIAL_CONVERSATION: Message[] = [
     {
@@ -67,7 +35,6 @@ export const useLlamaChat = () => {
   const [isDownloading, setIsDownloading] = useState(false);
   const [availableModels, setAvailableModels] = useState<ModelInfo[]>([]);
   const [selectedModel, setSelectedModel] = useState<ModelInfo | null>(null);
-  const [currentPage, setCurrentPage] = useState("modelSelection");
   const [tokensPerSecond, setTokensPerSecond] = useState<number[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
@@ -94,15 +61,13 @@ export const useLlamaChat = () => {
     fetchAvailableModels();
   }, []);
 
-  const handleModelSelection = (model: ModelInfo) => {
+  const handleModelSelection = async (model: ModelInfo) => {
     setSelectedModel(model);
     if (!model.downloaded) {
       const confirmed = window.confirm(`Do you want to download ${model.name}?`);
-      console.log("Confirmed",confirmed);
+      console.log("Confirmed", confirmed);
       if (confirmed) {
-        handleDownloadAndNavigate(model);
-      } else {
-        setSelectedModel(null);
+        await handleDownloadModel(model);
       }
     } else {
       // If model is already downloaded, just load it
@@ -114,19 +79,6 @@ export const useLlamaChat = () => {
     }
   };
 
-  const handleDownloadAndNavigate = async (model: ModelInfo) => {
-    await handleDownloadModel(model);
-    setCurrentPage("conversation");
-  };
-
-  const handleBackToModelSelection = () => {
-    setContext(false);
-    llmService.cleanup();
-    setConversation(INITIAL_CONVERSATION);
-    setSelectedModel(null);
-    setTokensPerSecond([]);
-    setCurrentPage("modelSelection");
-  };
 
   const toggleThought = (messageIndex: number) => {
     setConversation((prev) =>
@@ -140,15 +92,13 @@ export const useLlamaChat = () => {
     try {
       const models = await modelManager.updateModelsStatus();
       setDownloadedModels(models.map(model => model.name));
-      setAvailableModels(models); // Update available models with download status
+      setAvailableModels(models); 
     } catch (error) {
       console.error("Error checking downloaded models:", error);
     }
   };
 
-  useEffect(() => {
-    checkDownloadedModels();
-  }, [currentPage]);
+
 
   const handleDownloadModel = async (model: ModelInfo) => {
     setIsDownloading(true);
@@ -161,10 +111,10 @@ export const useLlamaChat = () => {
         setProgress(progress);
       });
       console.log(`Model ${model.name} downloaded successfully`);
-      
+
       // Update the models list to reflect the new download
       await checkDownloadedModels();
-      
+
       // Try to load the model
       const loaded = await loadModel(model.name);
       if (!loaded) {
@@ -182,7 +132,7 @@ export const useLlamaChat = () => {
 
   const stopGeneration = async () => {
     try {
-      await llmService.cleanup();
+      // await llmService.cleanup();
       setIsGenerating(false);
       setIsLoading(false);
 
@@ -209,15 +159,20 @@ export const useLlamaChat = () => {
     try {
       if (context) {
         console.log('Cleaning up existing model...');
-        await llmService.cleanup();
         setContext(false);
         setConversation(INITIAL_CONVERSATION);
       }
-      
-      const modelId = modelName.replace('.gguf', '');
-      console.log(`Initializing model with ID: ${modelId}`);
-      await llmService.initialize(modelId);
-      
+      const localDataDir = await appLocalDataDir();
+      const fullPath = await join(localDataDir, 'models', modelName);
+      console.log("modelPath", fullPath);
+      if (!fullPath) {
+        console.error('Model file not found at path:', fullPath);
+        throw new Error(`Model file not found at ${fullPath}`);
+      }
+
+      console.log(`Loading model from path: ${fullPath}`);
+      await llmService.loadModel(fullPath);
+
       setContext(true);
       console.log('Model loaded successfully');
       return true;
@@ -236,40 +191,42 @@ export const useLlamaChat = () => {
       return;
     }
     if (!userInput.trim()) {
-      alert("Please enter a message.");
       return;
     }
 
-    const newConversation = [
-      ...conversation,
-      { role: "user", content: userInput },
-    ];
-    setConversation(newConversation);
+    const userMessage = { role: "user", content: userInput };
+    const newConversation = [...conversation, userMessage];
+
+    // Add user message and an empty placeholder for the assistant's response
+    setConversation((prev) => [...prev, userMessage, { role: "assistant", content: "" }]);
     setUserInput("");
     setIsLoading(true);
     setIsGenerating(true);
-    setAutoScrollEnabled(true);
 
     try {
-      const response = await llmService.chat(newConversation);
-      
-      setConversation((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: response,
+      await llmService.generate(
+        newConversation,
+        (token) => {
+          setConversation((prev) => {
+            const lastMessage = { ...prev[prev.length - 1] };
+            lastMessage.content += token;
+            return [...prev.slice(0, -1), lastMessage];
+          });
         },
-      ]);
-
-      // For now, we'll use a mock value for tokens per second
-      setTokensPerSecond((prev) => [
-        ...prev,
-        20.0,
-      ]);
+        () => {
+          setIsLoading(false);
+          setIsGenerating(false);
+        }
+      );
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      alert(`Error During Inference: ${errorMessage}`);
-    } finally {
+      console.error("Error generating response:", error);
+      setConversation((prev) => {
+        const lastMessage = { ...prev[prev.length - 1] };
+        lastMessage.content = `Sorry, there was an error: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`;
+        return [...prev.slice(0, -1), lastMessage];
+      });
       setIsLoading(false);
       setIsGenerating(false);
     }
@@ -291,32 +248,27 @@ export const useLlamaChat = () => {
     // State
     conversation,
     userInput,
-    setUserInput,
     isLoading,
     progress,
     isDownloading,
     availableModels,
     selectedModel,
-    currentPage,
     tokensPerSecond,
     isGenerating,
     isFetching,
     autoScrollEnabled,
     downloadedModels,
-    
+
     // Functions
     handleModelSelection,
-    handleDownloadAndNavigate,
-    handleBackToModelSelection,
     toggleThought,
     fetchAvailableModels,
     handleSendMessage,
     stopGeneration,
     loadModel,
     handleScroll,
-    downloadModel: handleDownloadModel,
     cancelDownload: () => modelManager.cancelDownload(),
-    
+    setUserInput,
     // Refs
     scrollPositionRef,
     contentHeightRef,

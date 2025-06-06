@@ -26,4 +26,9 @@ tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
 tauri-plugin-http = "2"
 tauri-plugin-shell = "2"
+tokenizers = "0.21.1"
+anyhow = "1.0.98"
+tokio = { version = "1.45.1", features = ["full"] }
+rand = "0.9.1"
+llama-cpp-2 = "0.1.108"
 

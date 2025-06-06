@@ -39,7 +39,6 @@ class ModelManager {
         const file = await create(this.modelsDir, {
           baseDir: BaseDirectory.AppLocalData,
         });
-        console.log("Created models directory",JSON.stringify(file));
       }
     } catch (error) {
       console.error('Failed to initialize models directory:', error);
@@ -52,56 +51,67 @@ class ModelManager {
   }
 
   async fetchAvailableModels(): Promise<ModelInfo[]> {
-    const models: ModelInfo[] = [];
-  
-    for (const [modelName, repoPath] of Object.entries(this.modelRepos)) {
-      try {
-        const response = await axios.get<HuggingFaceResponse>(
-          `https://huggingface.co/api/models/${repoPath}`,
-          {
-            headers: {
-              'Accept': 'application/json',
-            }
-          }
-        );
-
-        console.log("Response",JSON.stringify(response.data,null,2));
-        
-        const ggufFiles = response.data.siblings.filter(file => 
-          file.rfilename.endsWith('.gguf')
-        );
-        
-        for (const file of ggufFiles) {
-          const modelInfo: ModelInfo = {
-            id: file.rfilename.replace('.gguf', ''),
-            name: file.rfilename,
-            description: `${modelName} model`,
-            size: this.formatFileSize(file.size || 0),
-            url: `https://huggingface.co/${repoPath}/resolve/main/${file.rfilename}`,
-            contextSize: this.getModelContextSize(modelName),
-            downloaded: false
-          };
-          
-          // Check if model is already downloaded
-          const modelPath = await join(this.modelsDir, modelInfo.name);
-          modelInfo.downloaded = await exists(modelPath, { 
-            baseDir: BaseDirectory.AppLocalData 
-          });
-          
-          models.push(modelInfo);
-        }
-      } catch (error) {
-        console.error(`Failed to fetch models for ${modelName}:`, error);
-      }
-    }
+    try {
+      // Ensure models directory exists
+      await this.initialize();
+      
+      const models: ModelInfo[] = [];
     
-    return models;
+      for (const [modelName, repoPath] of Object.entries(this.modelRepos)) {
+        try {
+          console.log("Fetching models for",`https://huggingface.co/api/models/${repoPath}`);
+          const response = await axios.get<HuggingFaceResponse>(
+            `https://huggingface.co/api/models/${repoPath}`,
+            {
+              headers: {
+                'Accept': 'application/json',
+              }
+            }
+          );
+
+          const ggufFiles = response.data.siblings.filter(file => 
+            file.rfilename.endsWith('.gguf')
+          );
+          for (const file of ggufFiles) {
+            const modelInfo: ModelInfo = {
+              id: file.rfilename.replace('.gguf', ''),
+              name: file.rfilename,
+              description: `${modelName} model`,
+              size: this.formatFileSize(file.size || 0),
+              url: `https://huggingface.co/${repoPath}/resolve/main/${file.rfilename}`,
+              contextSize: this.getModelContextSize(modelName),
+              downloaded: false
+            };
+            
+            try {
+              const modelPath = await join(this.modelsDir, modelInfo.name);
+              modelInfo.downloaded = await exists(modelPath, { 
+                baseDir: BaseDirectory.AppLocalData 
+              });
+            } catch (error) {
+              console.error(`Failed to check if model exists: ${modelInfo.name}`, error);
+              modelInfo.downloaded = false;
+            }
+
+            models.push(modelInfo);
+          }
+        } catch (error) {
+          console.error(`Failed to fetch models for ${modelName}:`, error);
+        }
+      }
+      
+      return models;
+    } catch (error) {
+      console.error('Failed to fetch available models:', error);
+      return [];
+    }
   }
 
   async downloadModel(modelInfo: ModelInfo, onProgress: (progress: number) => void): Promise<void> {
     console.log('Starting download process for model:', modelInfo.name);
     const modelPath = await join(this.modelsDir, modelInfo.name);
-    console.log('Target download path:', modelPath);
+   console.log('Target download path:', modelPath);
+   
     
     // Check if model is already downloaded
     const fileExists = await exists(modelPath, { baseDir: BaseDirectory.AppLocalData });
