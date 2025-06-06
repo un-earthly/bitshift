@@ -2,7 +2,6 @@ import React, { useRef, useEffect } from 'react';
 import { cn } from '../lib/utils';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
-import { ScrollArea } from './ui/scroll-area';
 import { useChatState } from '../hooks/useChatState';
 import ReactMarkdown from 'react-markdown';
 import {
@@ -30,13 +29,11 @@ interface LlamaChatProps {
 
 export const LlamaChat: React.FC<LlamaChatProps> = ({
   showHeader = true,
-  onDetach,
   maxMessageLength = 2000,
 }) => {
   const {
     conversation,
     userInput,
-    isLoading,
     isDownloading,
     progress,
     isGenerating,
@@ -106,8 +103,8 @@ export const LlamaChat: React.FC<LlamaChatProps> = ({
       {showHeader && (
         <div className="flex-none border-b border-border/40 bg-muted/40 p-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">LLaMA Chat</h2>
-            {onDetach && (
+            <h2 className="text-lg font-semibold">New Chat</h2>
+            {/* {onDetach && (
               <Button 
                 variant="outline" 
                 size="sm"
@@ -115,7 +112,7 @@ export const LlamaChat: React.FC<LlamaChatProps> = ({
               >
                 Detach
               </Button>
-            )}
+            )} */}
           </div>
           
           <div className="mt-4 space-y-4">
