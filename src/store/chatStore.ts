@@ -2,7 +2,8 @@ import { create } from 'zustand';
 import { modelManager } from '../services/modelManager';
 import { appLocalDataDir, join } from '@tauri-apps/api/path';
 import { llmService } from '../services/llmService';
-import { emit, listen, UnlistenFn } from '@tauri-apps/api/event';
+import { invoke } from '@tauri-apps/api/core';
+import { v4 as uuidv4 } from 'uuid';
 
 interface ModelInfo {
   id: string;
@@ -35,6 +36,7 @@ interface ChatState {
   isFetching: boolean;
   autoScrollEnabled: boolean;
   downloadedModels: string[];
+  currentSessionId: string;
   
   // Actions
   setContext: (context: boolean) => void;
@@ -55,6 +57,11 @@ interface ChatState {
   handleSendMessage: () => Promise<void>;
   stopGeneration: () => Promise<void>;
   handleModelSelection: (model: ModelInfo) => Promise<void>;
+  
+  // New actions
+  loadChatHistory: (sessionId: string) => Promise<void>;
+  createNewSession: () => void;
+  getSessions: () => Promise<string[]>;
 }
 
 const INITIAL_CONVERSATION: Message[] = [
@@ -78,6 +85,7 @@ const useChatStoreImpl = create<ChatState>((set, get) => ({
   isFetching: false,
   autoScrollEnabled: true,
   downloadedModels: [],
+  currentSessionId: uuidv4(),
 
   setContext: (context) => set({ context }),
   setConversation: (conversation) => set({ conversation }),
@@ -130,7 +138,7 @@ const useChatStoreImpl = create<ChatState>((set, get) => ({
   },
 
   handleSendMessage: async () => {
-    const { context, userInput, conversation, addMessage, setUserInput, setIsLoading, setIsGenerating, updateLastMessage } = get();
+    const { context, userInput, conversation, addMessage, setUserInput, setIsLoading, setIsGenerating, updateLastMessage, currentSessionId } = get();
 
     if (!context) {
       alert("Please load the model first.");
@@ -148,14 +156,29 @@ const useChatStoreImpl = create<ChatState>((set, get) => ({
     const newConversation = [...conversation, userMessage];
 
     try {
+      // Save user message to database and get a unique ID for the exchange
+      const messageId = uuidv4();
+      await invoke('insert_message', {
+        id: messageId,
+        sessionId: currentSessionId,
+        message: userInput,
+        response: ""
+      });
+
       await llmService.generate(
         newConversation,
-        (token) => {
+        async (token) => {
           updateLastMessage(token);
         },
-        () => {
+        async () => {
           setIsLoading(false);
           setIsGenerating(false);
+          // Update the message row with the assistant's complete response
+          const lastMessage = get().conversation[get().conversation.length - 1];
+          await invoke('update_message_response', {
+            id: messageId,
+            response: lastMessage.content
+          });
         }
       );
     } catch (error) {
@@ -192,24 +215,36 @@ const useChatStoreImpl = create<ChatState>((set, get) => ({
       await get().loadModel(model.name);
     }
   },
-}));
 
-// --- State Synchronization Logic ---
-const windowId = Math.random().toString(36).substring(7);
+  createNewSession: () => {
+    set({ 
+      currentSessionId: uuidv4(),
+      conversation: INITIAL_CONVERSATION 
+    });
+  },
 
-// 1. Listen for state changes from other windows
-const setupEventListener = () => {
-  return listen('state-changed', (event: { payload: { state: ChatState, from: string } }) => {
-    if (event.payload.from !== windowId) {
-      useChatStoreImpl.setState(event.payload.state);
+  loadChatHistory: async (sessionId: string) => {
+    try {
+      const messages = await invoke<Message[]>('get_chat_history', { sessionId });
+      console.log('Loaded chat history:', messages);
+      set({ 
+        currentSessionId: sessionId,
+        conversation: [...INITIAL_CONVERSATION, ...messages]
+      });
+    } catch (error) {
+      console.error('Failed to load chat history:', error);
     }
-  });
-};
+  },
 
-// 2. Broadcast state changes to other windows
-useChatStoreImpl.subscribe((state) => {
-  emit('state-changed', { state, from: windowId });
-});
+  getSessions: async () => {
+    try {
+      return await invoke<string[]>('get_sessions');
+    } catch (error) {
+      console.error('Failed to get sessions:', error);
+      return [];
+    }
+  },
+}));
 
 
 // Export the hook

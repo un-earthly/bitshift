@@ -4,6 +4,75 @@ use std::time::SystemTime;
 use std::{fs, path::PathBuf};
 use tauri::Manager;
 use tauri_plugin_fs::FsExt;
+mod db;
+use db::Database;
+
+#[derive(Debug, Serialize, Deserialize)]
+struct FrontendMessage {
+    role: String,
+    content: String,
+}
+
+#[tauri::command]
+fn insert_message(
+    app_handle: tauri::AppHandle,
+    id: String,
+    session_id: String,
+    message: String,
+    response: String,
+) -> Result<(), String> {
+    let db = app_handle.state::<Database>();
+    db.insert_message(&id, &session_id, &message, &response)
+}
+
+#[tauri::command]
+fn update_message_response(
+    app_handle: tauri::AppHandle,
+    id: String,
+    response: String,
+) -> Result<(), String> {
+    let db = app_handle.state::<Database>();
+    db.update_message_response(&id, &response)
+}
+
+#[tauri::command]
+fn get_chat_history(
+    app_handle: tauri::AppHandle,
+    session_id: String,
+) -> Result<Vec<FrontendMessage>, String> {
+    let db = app_handle.state::<Database>();
+    let history = db.get_chat_history(&session_id)?;
+
+    let frontend_history = history
+        .into_iter()
+        .flat_map(|db_msg| {
+            let user_message = FrontendMessage {
+                role: "user".to_string(),
+                content: db_msg.message,
+            };
+            if !db_msg.response.is_empty() {
+                vec![
+                    user_message,
+                    FrontendMessage {
+                        role: "assistant".to_string(),
+                        content: db_msg.response,
+                    },
+                ]
+            } else {
+                vec![user_message]
+            }
+        })
+        .collect();
+
+    Ok(frontend_history)
+}
+
+#[tauri::command]
+fn get_sessions(app_handle: tauri::AppHandle) -> Result<Vec<String>, String> {
+    let db = app_handle.state::<Database>();
+    db.get_sessions()
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FileMetadata {
     name: String,
@@ -98,6 +167,9 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
+            let handle = app.handle();
+            let db = db::Database::init(&handle).expect("Failed to initialize database");
+            app.manage(db);
             let app_data_dir = app
                 .path()
                 .app_data_dir()
@@ -126,7 +198,11 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             read_dir_metadata,
-            read_file_metadata
+            read_file_metadata,
+            insert_message,
+            get_chat_history,
+            get_sessions,
+            update_message_response
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

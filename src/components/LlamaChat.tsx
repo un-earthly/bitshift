@@ -44,10 +44,23 @@ export const LlamaChat: React.FC<LlamaChatProps> = ({
     setUserInput,
     selectedModel,
     availableModels,
+    createNewSession,
+    loadChatHistory,
+    getSessions,
   } = useChatState();
 
+  const [sessions, setSessions] = React.useState<string[]>([]);
   const [error, setError] = React.useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    loadSessions();
+  }, []);
+
+  const loadSessions = async () => {
+    const availableSessions = await getSessions();
+    setSessions(availableSessions);
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -103,16 +116,33 @@ export const LlamaChat: React.FC<LlamaChatProps> = ({
       {showHeader && (
         <div className="flex-none border-b border-border/40 bg-muted/40 p-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">New Chat</h2>
-            {/* {onDetach && (
-              <Button 
-                variant="outline" 
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-semibold">Chat</h2>
+              <Button
+                variant="outline"
                 size="sm"
-                onClick={onDetach}
+                onClick={() => {
+                  createNewSession();
+                  loadSessions();
+                }}
               >
-                Detach
+                New Chat
               </Button>
-            )} */}
+            </div>
+            <Select
+              onValueChange={(sessionId) => loadChatHistory(sessionId)}
+            >
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Load chat history" />
+              </SelectTrigger>
+              <SelectContent>
+                {sessions.map((sessionId) => (
+                  <SelectItem key={sessionId} value={sessionId}>
+                    Chat {sessionId.slice(0, 8)}...
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           
           <div className="mt-4 space-y-4">
