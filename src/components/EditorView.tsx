@@ -1,57 +1,99 @@
 import React from 'react';
-import Editor, { OnChange } from '@monaco-editor/react';
-import '../styles/EditorView.css';
+import Editor from '@monaco-editor/react';
+import { cn } from '@/lib/utils';
 
-type Props = {
+interface EditorViewProps {
   filePath: string;
   content: string;
   onChange: (content: string) => void;
-};
+  className?: string;
+}
 
-const EditorView: React.FC<Props> = ({ filePath, content, onChange }) => {
-  // Get file extension to determine language
+const EditorView: React.FC<EditorViewProps> = ({
+  filePath,
+  content,
+  onChange,
+  className
+}) => {
   const getLanguage = (path: string) => {
-    const ext = path.split('.').pop()?.toLowerCase();
-    switch (ext) {
-      case 'js':
-      case 'jsx':
-        return 'javascript';
-      case 'ts':
-      case 'tsx':
-        return 'typescript';
-      case 'py':
-        return 'python';
-      case 'rs':
-        return 'rust';
-      case 'json':
-        return 'json';
-      case 'md':
-        return 'markdown';
-      case 'css':
-        return 'css';
-      case 'html':
-        return 'html';
-      default:
-        return 'plaintext';
-    }
+    const ext = path.split('.').pop()?.toLowerCase() || '';
+    const languageMap: { [key: string]: string } = {
+      'js': 'javascript',
+      'jsx': 'javascript',
+      'ts': 'typescript',
+      'tsx': 'typescript',
+      'py': 'python',
+      'rs': 'rust',
+      'css': 'css',
+      'html': 'html',
+      'json': 'json',
+      'md': 'markdown',
+      'yml': 'yaml',
+      'yaml': 'yaml',
+      'toml': 'toml',
+      'sql': 'sql',
+      'graphql': 'graphql',
+      'prisma': 'prisma',
+      'sh': 'shell',
+      'bash': 'shell',
+      'go': 'go',
+      'c': 'c',
+      'cpp': 'cpp',
+      'h': 'cpp',
+      'hpp': 'cpp',
+      'java': 'java',
+      'php': 'php',
+      'rb': 'ruby',
+      'swift': 'swift',
+      'vue': 'vue',
+      'xml': 'xml',
+      'dockerfile': 'dockerfile',
+    };
+    return languageMap[ext] || 'plaintext';
   };
 
   return (
-    <div className="editor-view">
-      <div className="editor-header">{filePath}</div>
+    <div className={cn("h-full w-full flex flex-col", className)}>
       <Editor
         height="100%"
+        defaultValue={content}
         defaultLanguage={getLanguage(filePath)}
-        value={content}
-        onChange={onChange as OnChange}
+        onChange={(value) => onChange(value || '')}
         theme="vs-dark"
         options={{
+          fontFamily: 'JetBrains Mono, monospace',
           fontSize: 14,
-          minimap: { enabled: false },
+          lineHeight: 1.5,
+          minimap: { enabled: true },
+          scrollBeyondLastLine: false,
+          folding: true,
+          foldingStrategy: 'indentation',
+          autoIndent: 'full',
+          formatOnPaste: true,
+          formatOnType: true,
+          tabSize: 2,
           wordWrap: 'on',
+          wrappingStrategy: 'advanced',
+          padding: { top: 10, bottom: 10 },
           lineNumbers: 'on',
           renderWhitespace: 'selection',
-          scrollBeyondLastLine: false,
+          bracketPairColorization: {
+            enabled: true,
+          },
+          guides: {
+            bracketPairs: true,
+            indentation: true,
+          },
+          cursorBlinking: 'smooth',
+          cursorSmoothCaretAnimation: "on",
+          smoothScrolling: true,
+          renderLineHighlight: 'all',
+          quickSuggestions: {
+            other: true,
+            comments: true,
+            strings: true
+          },
+          acceptSuggestionOnEnter: 'on',
         }}
       />
     </div>

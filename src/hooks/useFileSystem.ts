@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { readTextFile } from '@tauri-apps/plugin-fs';
 import { invoke } from '@tauri-apps/api/core';
+import { useEditorStore } from '@/store/editorStore';
 
 // Match the Rust struct exactly
 interface FileMetadata {
@@ -24,19 +25,19 @@ export const useFileSystem = () => {
 
   const readFolder = async (path: string, depth: number = 1): Promise<FileNode[]> => {
     try {
-        const entries = await invoke<FileMetadata[]>('read_dir_metadata', { path, depth });
-        console.log("Received metadata:", entries);
-        const convertToFileNode = (entry: FileMetadata): FileNode => ({
-            ...entry,
-            isExpanded: false,
-            children: entry.children?.map(convertToFileNode)
-        });
-        return entries.map(convertToFileNode);
+      const entries = await invoke<FileMetadata[]>('read_dir_metadata', { path, depth });
+      console.log("Received metadata:", entries);
+      const convertToFileNode = (entry: FileMetadata): FileNode => ({
+        ...entry,
+        isExpanded: false,
+        children: entry.children?.map(convertToFileNode)
+      });
+      return entries.map(convertToFileNode);
     } catch (err) {
-        console.error('Error reading folder:', path, err);
-        return [];
+      console.error('Error reading folder:', path, err);
+      return [];
     }
-};
+  };
 
   const loadFolder = async (rootPath: string) => {
     const rootNodes = await readFolder(rootPath, 2);
@@ -78,6 +79,8 @@ export const useFileSystem = () => {
         setOpenFiles(prev => [...prev, { path: filePath, content }]);
       }
       setActivePath(filePath);
+      // Add the file to the editor store
+      useEditorStore.getState().openFile(filePath, content);
     } catch (err) {
       console.error('Failed to open file:', filePath, err);
     }

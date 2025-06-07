@@ -4,15 +4,17 @@ import {
   PanelGroup,
   PanelResizeHandle,
 } from "react-resizable-panels";
-import FileTree from './components/FileTree';
-import EditorView from './components/EditorView';
-import {ChatSidebar} from './components/ChatSidebar';
-import {useFileSystem} from './hooks/useFileSystem';
+import { ChatSidebar } from './components/ChatSidebar';
+import { useFileSystem } from './hooks/useFileSystem';
 import { open } from '@tauri-apps/plugin-dialog';
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
-import './App.css'; 
 import { Button } from './components/ui/button';
 import { useTheme } from './components/theme-provider';
+import { FolderOpen, Moon, Sun, MessageSquare } from 'lucide-react';
+import { Separator } from './components/ui/separator';
+import './App.css';
+import { EditorLayout } from './components/EditorLayout';
+import { FileTreeContainer } from './components/FileTreeContainer';
 
 const App: React.FC = () => {
   const [isChatVisible, setIsChatVisible] = useState(true);
@@ -20,10 +22,8 @@ const App: React.FC = () => {
 
   const {
     tree,
-    activeFile,
     loadFolder,
     openFile,
-    updateFileContent,
     toggleFolder,
   } = useFileSystem();
 
@@ -63,7 +63,7 @@ const App: React.FC = () => {
       width: 400,
       height: 600,
     });
-    
+
     // Listen for the detached window to be closed
     const unlisten = await chatWindow.onCloseRequested(async () => {
       // When it's closed, show the sidebar again
@@ -83,81 +83,81 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="h-screen w-screen overflow-hidden bg-background">
-      <PanelGroup 
-        direction="horizontal" 
-        className="h-full"
-      >
-        <Panel 
-          defaultSize={20} 
-          minSize={10}
-          className="border-r border-border/40"
-        >
-          <div className="flex h-full flex-col bg-muted/40">
-            <div className="flex flex-col gap-2 p-4 border-b border-border/40">
-              <div className="flex items-center justify-between">
-                <Button 
-                  onClick={handleOpenFolder} 
-                  variant="outline"
-                  className="flex-1"
-                >
-                  Open Folder
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={toggleTheme}
-                  className="ml-2"
-                >
-                  {theme === 'light' ? '🌙' : '☀️'}
-                </Button>
-              </div>
-            </div>
-            <div className="flex-1 overflow-auto p-2">
-              <FileTree 
-                nodes={tree} 
-                onFileClick={openFile}
-                onFolderClick={toggleFolder}
-              />
-            </div>
-          </div>
-        </Panel>
-
-        <PanelResizeHandle className="w-2 bg-border/40 hover:bg-border/60 transition-colors" />
-
-        <Panel 
-          defaultSize={50} 
-          minSize={30}
-          className="bg-background"
-        >
-          <div className="h-full">
-            {activeFile ? (
-              <EditorView
-                filePath={activeFile.path}
-                content={activeFile.content}
-                onChange={updateFileContent}
-              />
-            ) : (
-              <div className="flex h-full items-center justify-center text-muted-foreground">
-                Open a file to start editing
-              </div>
-            )}
-          </div>
-        </Panel>
-
-        {isChatVisible && (
-          <>
-            <PanelResizeHandle className="w-2 bg-border/40 hover:bg-border/60 transition-colors" />
-            <Panel 
-              defaultSize={30} 
-              minSize={20}
-              className="border-l border-border/40"
+    <div className="relative h-screen w-screen overflow-hidden bg-background">
+      {/* Top Header */}
+      <div className="absolute top-0 z-10 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="flex h-14 items-center gap-4 px-4">
+          <Button onClick={handleOpenFolder} variant="outline" size="sm" className="gap-2">
+            <FolderOpen className="h-4 w-4" />
+            Open Folder
+          </Button>
+          <Separator orientation="vertical" className="h-6" />
+          <div className="ml-auto flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsChatVisible(!isChatVisible)}
+              className="h-8 w-8"
             >
-              <ChatSidebar onDetach={handleDetach} />
-            </Panel>
-          </>
-        )}
-      </PanelGroup>
+              <MessageSquare className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleTheme}
+              className="h-8 w-8"
+            >
+              {theme === 'light' ?
+                <Moon className="h-4 w-4" /> :
+                <Sun className="h-4 w-4" />
+              }
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="pt-14 h-full">
+        <PanelGroup direction="horizontal" className="h-full">
+          <Panel
+            defaultSize={20}
+            minSize={15}
+            className="border-r border-border/40"
+          >
+            <div className="flex h-full flex-col bg-muted/30">
+              <div className="flex-1 overflow-auto p-2">
+                <FileTreeContainer
+                  nodes={tree}
+                  onFolderClick={toggleFolder}
+                />
+              </div>
+            </div>
+          </Panel>
+
+          <PanelResizeHandle className="w-1.5 bg-border/40 hover:bg-border/60 transition-colors" />
+
+          <Panel
+            defaultSize={50}
+            minSize={30}
+            className="bg-background"
+          >
+            <EditorLayout />
+          </Panel>
+
+          {isChatVisible && (
+            <>
+              <PanelResizeHandle className="w-1.5 bg-border/40 hover:bg-border/60 transition-colors" />
+              <Panel
+                defaultSize={30}
+                minSize={20}
+                className="border-l border-border/40"
+              >
+                <ChatSidebar onDetach={handleDetach} />
+              </Panel>
+            </>
+          )}
+        </PanelGroup>
+      </div>
     </div>
   );
 };

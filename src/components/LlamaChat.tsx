@@ -14,9 +14,9 @@ import {
 
 const ProgressBar = ({ progress }: { progress: number }) => (
   <div className="h-1 w-full overflow-hidden rounded-full bg-muted">
-    <div 
-      className="h-full bg-primary transition-all duration-500" 
-      style={{ width: `${progress}%` }} 
+    <div
+      className="h-full bg-primary transition-all duration-500"
+      style={{ width: `${progress}%` }}
     />
   </div>
 );
@@ -86,7 +86,7 @@ export const LlamaChat: React.FC<LlamaChatProps> = ({
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const validationError = validateInput(userInput);
-    
+
     if (validationError) {
       setError(validationError);
       return;
@@ -101,7 +101,7 @@ export const LlamaChat: React.FC<LlamaChatProps> = ({
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newValue = e.target.value;
     setUserInput(newValue);
-    
+
     if (error) {
       setError(null);
     }
@@ -135,16 +135,16 @@ export const LlamaChat: React.FC<LlamaChatProps> = ({
               <SelectTrigger className="w-[200px]">
                 <SelectValue placeholder="Load chat history" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-gray-950" >
                 {sessions.map((sessionId) => (
-                  <SelectItem key={sessionId} value={sessionId}>
+                  <SelectItem key={sessionId} value={sessionId} >
                     Chat {sessionId.slice(0, 8)}...
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
-          
+
           <div className="mt-4 space-y-4">
             <Select
               value={selectedModel?.name || ""}
@@ -160,7 +160,7 @@ export const LlamaChat: React.FC<LlamaChatProps> = ({
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select a model" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-gray-950">
                 {isFetching ? (
                   <SelectItem value="loading" disabled>
                     Fetching models...

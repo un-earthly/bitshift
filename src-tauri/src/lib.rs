@@ -6,7 +6,8 @@ use tauri::Manager;
 use tauri_plugin_fs::FsExt;
 mod db;
 use db::Database;
-
+mod terminal;
+use crate::terminal::execute_command;
 #[derive(Debug, Serialize, Deserialize)]
 struct FrontendMessage {
     role: String,
@@ -202,7 +203,8 @@ pub fn run() {
             insert_message,
             get_chat_history,
             get_sessions,
-            update_message_response
+            update_message_response,
+            execute_command
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
