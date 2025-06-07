@@ -14,7 +14,7 @@ export const Terminal: React.FC<TerminalProps> = ({ className }) => {
     const terminalRef = useRef<HTMLDivElement>(null);
     const xtermRef = useRef<XTerm | null>(null);
 
-    const { executeCommand, currentDirectory } = useTerminal();
+    const { executeCommand, currentDirectory, getAutocomplete } = useTerminal();
 
     useEffect(() => {
         if (!terminalRef.current) return;
@@ -73,11 +73,43 @@ export const Terminal: React.FC<TerminalProps> = ({ className }) => {
 
         let currentLine = '';
         let commandHistory: string[] = [];
-        let historyIndex = -1;
-
-        // Handle terminal input
+        let historyIndex = -1;        // Handle terminal input
         xterm.onData((data) => {
             const code = data.charCodeAt(0);
+
+            // Handle Tab key for autocompletion
+            if (code === 9) {
+                getAutocomplete(currentLine).then(({ suggestions, partialPath }) => {
+                    if (suggestions.length === 1) {
+                        // Clear current partial path
+                        const chars = partialPath.length;
+                        for (let i = 0; i < chars; i++) {
+                            xterm.write('\b \b');
+                        }
+                        // Write the completed path
+                        const completion = suggestions[0];
+                        xterm.write(completion);
+                        currentLine = currentLine.slice(0, -partialPath.length) + completion;
+                    } else if (suggestions.length > 1) {
+                        xterm.write('\r\n');
+                        // Show all suggestions in a formatted grid
+                        const maxLength = Math.max(...suggestions.map(s => s.length));
+                        const terminalWidth = xterm.cols;
+                        const itemsPerRow = Math.floor(terminalWidth / (maxLength + 2));
+
+                        for (let i = 0; i < suggestions.length; i += itemsPerRow) {
+                            const row = suggestions.slice(i, i + itemsPerRow)
+                                .map(s => s.padEnd(maxLength + 2))
+                                .join('');
+                            xterm.write(row + '\r\n');
+                        }
+
+                        // Rewrite prompt and current command
+                        xterm.write(`$ ${currentDirectory}> ${currentLine}`);
+                    }
+                });
+                return;
+            }
 
             // Handle Enter key
             if (code === 13) {

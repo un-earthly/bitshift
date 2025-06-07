@@ -23,7 +23,6 @@ const App: React.FC = () => {
   const {
     tree,
     loadFolder,
-    openFile,
     toggleFolder,
   } = useFileSystem();
 
