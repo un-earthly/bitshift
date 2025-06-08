@@ -32,6 +32,10 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "resources": [
+      "assets/data/keybindings.json",
+      "assets/**/*"
+    ],
     "externalBin": [
       "runtime/llama-cpp/bin/libggml-base.so",
       "runtime/llama-cpp/bin/libggml-cpu.so",

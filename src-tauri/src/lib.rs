@@ -8,6 +8,9 @@ mod db;
 use db::Database;
 mod terminal;
 use crate::terminal::execute_command;
+mod file_ops;
+use file_ops::{rename, remove, create_dir, copy, move_item, index_workspace};
+
 #[derive(Debug, Serialize, Deserialize)]
 struct FrontendMessage {
     role: String,
@@ -189,12 +192,15 @@ pub fn run() {
                 .allow_directory(&models_dir, true)
                 .expect("Failed to allow models directory access");
 
+            // Allow access to source directory in development
             #[cfg(debug_assertions)]
             {
+                let current_dir = std::env::current_dir().expect("Failed to get current directory");
                 fs_scope
-                    .allow_directory("/", true)
-                    .expect("Failed to allow full file system access");
+                    .allow_directory(&current_dir, true)
+                    .expect("Failed to allow source directory access");
             }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -204,7 +210,13 @@ pub fn run() {
             get_chat_history,
             get_sessions,
             update_message_response,
-            execute_command
+            execute_command,
+            rename,
+            remove,
+            create_dir,
+            copy,
+            move_item,
+            index_workspace
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

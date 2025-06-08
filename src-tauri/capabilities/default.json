@@ -27,7 +27,10 @@
     "fs:allow-appdata-write-recursive",
     "fs:allow-applocaldata-write",
     "fs:allow-applocaldata-write-recursive",
+    "fs:allow-read-text-file",
+    "fs:allow-resource-read-recursive",
     "fs:write-all",
+    "fs:read-all",
     "shell:default",
     "core:window:allow-destroy",
     {

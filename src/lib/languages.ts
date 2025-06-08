@@ -1,0 +1,36 @@
+export const getLanguage = (path: string) => {
+  const ext = path.split('.').pop()?.toLowerCase() || '';
+  const languageMap: { [key: string]: string } = {
+    'js': 'javascript',
+    'jsx': 'javascript',
+    'ts': 'typescript',
+    'tsx': 'typescript',
+    'py': 'python',
+    'rs': 'rust',
+    'css': 'css',
+    'html': 'html',
+    'json': 'json',
+    'md': 'markdown',
+    'yml': 'yaml',
+    'yaml': 'yaml',
+    'toml': 'toml',
+    'sql': 'sql',
+    'graphql': 'graphql',
+    'prisma': 'prisma',
+    'sh': 'shell',
+    'bash': 'shell',
+    'go': 'go',
+    'c': 'c',
+    'cpp': 'cpp',
+    'h': 'cpp',
+    'hpp': 'cpp',
+    'java': 'java',
+    'php': 'php',
+    'rb': 'ruby',
+    'swift': 'swift',
+    'vue': 'vue',
+    'xml': 'xml',
+    'dockerfile': 'dockerfile',
+  };
+  return languageMap[ext] || 'plaintext';
+}; 

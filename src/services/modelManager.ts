@@ -36,7 +36,7 @@ class ModelManager {
       });
       
       if (!modelsDirExists) {
-        const file = await create(this.modelsDir, {
+        await create(this.modelsDir, {
           baseDir: BaseDirectory.AppLocalData,
         });
       }
