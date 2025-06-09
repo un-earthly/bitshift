@@ -16,6 +16,7 @@ import { EditorLayout } from './components/EditorLayout';
 import { FileTreeContainer } from './components/FileTreeContainer';
 import { useKeybindings } from './hooks/useKeybindings';
 import { useCommandRegistry } from './commands/registry';
+import { useContextKeys } from './commands/contextKeys';
 import { Toaster } from 'sonner';
 import './App.css';
 
@@ -35,6 +36,24 @@ const App: React.FC = () => {
     closeCurrentFile,
   } = useFileSystem();
 
+  const registerCommand = useCommandRegistry(state => state.registerCommand);
+  const unregisterCommand = useCommandRegistry(state => state.unregisterCommand);
+  const setContext = useContextKeys(state => state.setContext);
+
+  // Initialize keybindings
+  useKeybindings();
+
+  // Initialize contexts
+  useEffect(() => {
+    // Set up initial contexts
+    setContext('inZenMode', false);
+    setContext('editorFocus', true);
+    setContext('terminalFocus', false);
+    setContext('chatFocus', false);
+    setContext('sidebarVisible', isSidebarVisible);
+    setContext('chatVisible', isChatVisible);
+  }, [setContext, isSidebarVisible, isChatVisible]);
+
   const handleOpenFolder = async () => {
     try {
       const selected = await open({
@@ -49,21 +68,9 @@ const App: React.FC = () => {
     }
   };
 
-  const registerCommand = useCommandRegistry(state => state.registerCommand);
-  const unregisterCommand = useCommandRegistry(state => state.unregisterCommand);
-
-  // Initialize keybindings
-  useKeybindings();
-
   useEffect(() => {
     // Register file-related commands
     registerCommand('workbench.action.files.openFile', handleOpenFolder);
-    registerCommand('workbench.action.files.newFile', async () => {
-      if (!workspacePath) return;
-      const fileName = 'untitled.txt';
-      await createNewFile(`${workspacePath}/${fileName}`);
-    });
-
     registerCommand('workbench.action.files.newFolder', async () => {
       if (!workspacePath) return;
       const folderName = 'new-folder';
@@ -78,16 +85,16 @@ const App: React.FC = () => {
     // Register workbench commands
     registerCommand('workbench.action.toggleSidebarVisibility', () => {
       setIsSidebarVisible(!isSidebarVisible);
+      setContext('sidebarVisible', !isSidebarVisible);
     });
 
     registerCommand('workbench.action.toggleChat', () => {
       setIsChatVisible(!isChatVisible);
+      setContext('chatVisible', !isChatVisible);
     });
 
-    // Cleanup on unmount
     return () => {
       unregisterCommand('workbench.action.files.openFile');
-      unregisterCommand('workbench.action.files.newFile');
       unregisterCommand('workbench.action.files.newFolder');
       unregisterCommand('workbench.action.files.save');
       unregisterCommand('workbench.action.files.saveAs');
@@ -97,7 +104,7 @@ const App: React.FC = () => {
       unregisterCommand('workbench.action.toggleChat');
     };
   }, [registerCommand, unregisterCommand, workspacePath, createNewFile, createNewFolder,
-    saveCurrentFile, saveFileAs, closeCurrentFile, isSidebarVisible, isChatVisible, handleOpenFolder]);
+    saveCurrentFile, saveFileAs, closeCurrentFile, isSidebarVisible, isChatVisible, handleOpenFolder, setContext]);
 
   useEffect(() => {
     const checkDetachedWindow = async () => {
@@ -133,6 +140,8 @@ const App: React.FC = () => {
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-background">
       <Toaster richColors position="top-right" />
+
+      {/* Top Bar */}
       <div className="absolute top-0 z-10 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="flex h-14 items-center gap-4 px-4">
           <Button onClick={handleOpenFolder} variant="outline" size="sm" className="gap-2">
@@ -161,51 +170,52 @@ const App: React.FC = () => {
         </div>
       </div>
 
-      <div className="pt-14 h-full flex flex-col">
-        <div className="flex-1">
-          <PanelGroup direction="horizontal" className="h-full">
-            {isSidebarVisible && (
-              <>
-                <Panel
-                  defaultSize={20}
+      {/* Main Content */}
+      <div className="pt-14">
+        <PanelGroup direction="horizontal" autoSaveId="app-layout">
+          {/* File Tree */}
+          {isSidebarVisible && (
+            <>
+              <Panel id="filetree" defaultSize={15} minSize={10} maxSize={30}>
+                <div className="h-full border-r border-border/40">
+                  <FileTreeContainer
+                    nodes={tree}
+                    onFolderClick={toggleFolder}
+                    workspacePath={workspacePath || ''}
+                  />
+                </div>
+              </Panel>
+              <PanelResizeHandle className="w-1.5 bg-border/40 hover:bg-border/60 transition-colors" />
+            </>
+          )}
 
-                  className="border-r border-border/40"
-                >
-                  <div className="flex h-full flex-col bg-muted/30">
-                    <div className="flex-1 overflow-auto p-2">
-                      <FileTreeContainer
-                        nodes={tree}
-                        onFolderClick={toggleFolder}
-                        workspacePath={workspacePath || ''}
-                      />
-                    </div>
-                  </div>
-                </Panel>
-                <PanelResizeHandle className="w-1.5 bg-border/40 hover:bg-border/60 transition-colors" />
-              </>
-            )}
+          {/* Editor */}
+          <Panel
+            id="editor"
+            defaultSize={isSidebarVisible ? (isChatVisible ? 65 : 85) : (isChatVisible ? 80 : 100)}
+            minSize={40}
+          >
+            <EditorLayout />
+          </Panel>
 
-            <Panel
-              defaultSize={50}
-
-              className="bg-background"
-            >
-              <EditorLayout />
-            </Panel>
-
-            {isChatVisible && (
-              <>
-                <PanelResizeHandle className="w-1.5 bg-border/40 hover:bg-border/60 transition-colors" />
-                <Panel
-                  defaultSize={30}
-                  className="border-l border-border/40"
-                >
+          {/* Chat */}
+          {isChatVisible && (
+            <>
+              <PanelResizeHandle className="w-1.5 bg-border/40 hover:bg-border/60 transition-colors" />
+              <Panel
+                id="chat"
+                defaultSize={20}
+                minSize={15}
+                maxSize={40}
+                order={2}
+              >
+                <div className="h-full border-l border-border/40">
                   <ChatSidebar onDetach={handleDetach} />
-                </Panel>
-              </>
-            )}
-          </PanelGroup>
-        </div>
+                </div>
+              </Panel>
+            </>
+          )}
+        </PanelGroup>
       </div>
     </div>
   );

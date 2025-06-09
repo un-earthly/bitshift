@@ -27,6 +27,7 @@ export const EditorLayout: React.FC = () => {
 
     useEffect(() => {
         // Register panel/terminal commands
+        registerCommand('workbench.action.terminal.toggleTerminal', () => setIsTerminalVisible(prev => !prev));
         registerCommand('workbench.action.togglePanel', () => setIsTerminalVisible(prev => !prev));
 
         // Register split editor commands
@@ -55,6 +56,7 @@ export const EditorLayout: React.FC = () => {
         // Cleanup on unmount
         return () => {
             unregisterCommand('workbench.action.togglePanel');
+            unregisterCommand('workbench.action.terminal.toggleTerminal');
             unregisterCommand('workbench.action.splitEditor');
             unregisterCommand('workbench.action.splitEditorDown');
             unregisterCommand('workbench.action.closeActiveEditor');
@@ -156,15 +158,19 @@ export const EditorLayout: React.FC = () => {
     );
 
     return (
-        <PanelGroup direction="vertical" className="h-full">
-            <Panel defaultSize={isTerminalVisible ? 70 : 100} className="h-full">
+        <PanelGroup direction="vertical" autoSaveId="editor-layout">
+            <Panel id="editor-main" defaultSize={70} minSize={30}>
                 <PanelGroup direction={layout.direction} className="h-full">
                     {layout.panes.map((pane, index) => (
                         <React.Fragment key={pane.id}>
                             {index > 0 && (
                                 <PanelResizeHandle className="w-1.5 bg-border/40 hover:bg-border/60 transition-colors" />
                             )}
-                            <Panel defaultSize={layout.sizes[index]} className="h-full">
+                            <Panel
+                                id={`editor-pane-${pane.id}`}
+                                defaultSize={layout.sizes[index]}
+                                className="h-full"
+                            >
                                 {renderPane(pane)}
                             </Panel>
                         </React.Fragment>
@@ -175,7 +181,13 @@ export const EditorLayout: React.FC = () => {
             {isTerminalVisible && (
                 <>
                     <PanelResizeHandle className="h-1.5 bg-border/40 hover:bg-border/60 transition-colors" />
-                    <Panel defaultSize={30} minSize={20}>
+                    <Panel
+                        id="terminal"
+                        defaultSize={30}
+                        minSize={10}
+                        maxSize={70}
+                        order={2}
+                    >
                         <TerminalComponent />
                     </Panel>
                 </>
