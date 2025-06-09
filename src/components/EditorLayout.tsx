@@ -1,15 +1,69 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { useEditorStore } from '@/store/editorStore';
 import EditorView from './EditorView';
-import { Terminal } from './Terminal';
+
 import { Button } from './ui/button';
 import { X, Maximize2, SplitSquareHorizontal, SplitSquareVertical, Terminal as TerminalIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import TerminalComponent from './Terminal';
+import { useCommandRegistry } from '@/commands/registry';
 
 export const EditorLayout: React.FC = () => {
     const [isTerminalVisible, setIsTerminalVisible] = useState(false);
-    const { layout, closeTab, setActiveTab, splitPane, closePane, updateContent } = useEditorStore();
+    const {
+        layout,
+        closeTab,
+        setActiveTab,
+        splitPane,
+        closePane,
+        updateContent,
+        closeAllTabs,
+        closeAllPanes,
+        closeTabsInPane
+    } = useEditorStore();
+    const registerCommand = useCommandRegistry(state => state.registerCommand);
+    const unregisterCommand = useCommandRegistry(state => state.unregisterCommand);
+
+    useEffect(() => {
+        // Register panel/terminal commands
+        registerCommand('workbench.action.togglePanel', () => setIsTerminalVisible(prev => !prev));
+
+        // Register split editor commands
+        registerCommand('workbench.action.splitEditor', (paneId: string) => splitPane(paneId, 'vertical'));
+        registerCommand('workbench.action.splitEditorDown', (paneId: string) => splitPane(paneId, 'horizontal'));
+
+        // Register window/editor closing commands
+        registerCommand('workbench.action.closeActiveEditor', (paneId: string, tabId: string) => {
+            closeTab(paneId, tabId);
+        });
+        registerCommand('workbench.action.closeAllEditors', () => {
+            closeAllTabs();
+        });
+        registerCommand('workbench.action.closeAllGroups', () => {
+            closeAllPanes();
+        });
+        registerCommand('workbench.action.closeEditorsInGroup', (paneId: string) => {
+            closeTabsInPane(paneId);
+        });
+        registerCommand('workbench.action.closeGroup', (paneId: string) => {
+            if (layout.panes.length > 1) {
+                closePane(paneId);
+            }
+        });
+
+        // Cleanup on unmount
+        return () => {
+            unregisterCommand('workbench.action.togglePanel');
+            unregisterCommand('workbench.action.splitEditor');
+            unregisterCommand('workbench.action.splitEditorDown');
+            unregisterCommand('workbench.action.closeActiveEditor');
+            unregisterCommand('workbench.action.closeAllEditors');
+            unregisterCommand('workbench.action.closeAllGroups');
+            unregisterCommand('workbench.action.closeEditorsInGroup');
+            unregisterCommand('workbench.action.closeGroup');
+        };
+    }, [registerCommand, unregisterCommand, splitPane, closePane, closeTab, closeAllTabs, closeAllPanes, closeTabsInPane, layout.panes.length]);
 
     const toggleTerminal = () => setIsTerminalVisible(prev => !prev);
 
@@ -122,7 +176,7 @@ export const EditorLayout: React.FC = () => {
                 <>
                     <PanelResizeHandle className="h-1.5 bg-border/40 hover:bg-border/60 transition-colors" />
                     <Panel defaultSize={30} minSize={20}>
-                        <Terminal />
+                        <TerminalComponent />
                     </Panel>
                 </>
             )}

@@ -6,10 +6,8 @@ use tauri::Manager;
 use tauri_plugin_fs::FsExt;
 mod db;
 use db::Database;
-mod terminal;
-use crate::terminal::execute_command;
 mod file_ops;
-use file_ops::{rename, remove, create_dir, copy, move_item, index_workspace};
+use file_ops::{copy, create_dir, index_workspace, move_item, remove, rename};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct FrontendMessage {
@@ -165,6 +163,7 @@ async fn read_file_metadata(path: String) -> Result<FileMetadata, String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_fs::init())
@@ -201,6 +200,31 @@ pub fn run() {
                     .expect("Failed to allow source directory access");
             }
 
+            // Allow full filesystem access
+            {
+                let fs_scope = app.fs_scope();
+
+                #[cfg(unix)]
+                {
+                    fs_scope
+                        .allow_directory("/", true)
+                        .expect("Failed to allow root directory access");
+                }
+
+                #[cfg(windows)]
+                {
+                    // Allow all Windows drives
+                    for drive in 'A'..='Z' {
+                        let drive_path = format!("{}:\\", drive);
+                        if std::path::Path::new(&drive_path).exists() {
+                            fs_scope
+                                .allow_directory(&drive_path, true)
+                                .expect(&format!("Failed to allow access to drive {}", drive));
+                        }
+                    }
+                }
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -210,7 +234,6 @@ pub fn run() {
             get_chat_history,
             get_sessions,
             update_message_response,
-            execute_command,
             rename,
             remove,
             create_dir,

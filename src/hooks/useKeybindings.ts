@@ -1,7 +1,7 @@
-import { useEffect, useCallback, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { resolveResource } from '@tauri-apps/api/path';
 import { readTextFile } from '@tauri-apps/plugin-fs';
-
+import { useCommandRegistry } from '../commands/registry';
 
 interface Keybinding {
   key: string;
@@ -73,27 +73,17 @@ export interface WorkbenchHandlers {
   onToggleSidebar?: () => void;
 }
 
-interface KeybindingHandlers {
-  [command: string]: (...args: any[]) => void;
-}
-
-export function useKeybindings(handlers: KeybindingHandlers) {
-  const handlerRef = useRef<KeybindingHandlers>(handlers);
+export function useKeybindings() {
   const [keybindings, setKeybindings] = useState<Keybinding[]>([]);
-  handlerRef.current = handlers;
+  const executeCommand = useCommandRegistry(state => state.executeCommand);
 
   useEffect(() => {
     // Load keybindings using Tauri's filesystem API
     const loadKeybindings = async () => {
       try {
-
-
-        // try {
         const resourcePath = await resolveResource('assets/data/keybindings.json');
-        console.log('Resource path:', resourcePath);
-        
         const data = JSON.parse(await readTextFile(resourcePath));
-        console.log('Data:', data);
+
         if (!Array.isArray(data)) {
           throw new Error('Keybindings data is not an array');
         }
@@ -110,56 +100,34 @@ export function useKeybindings(handlers: KeybindingHandlers) {
 
   useEffect(() => {
     const handleKeyEvent = (event: KeyboardEvent) => {
-      // Log the raw event first
-      console.log('KeyboardEvent:', {
-        key: event.key,
-        ctrlKey: event.ctrlKey,
-        target: event.target
-      });
-
       // Build key combination string (e.g., "ctrl+k ctrl+c")
       const modifiers = [];
       if (event.ctrlKey) modifiers.push('ctrl');
       if (event.shiftKey) modifiers.push('shift');
       if (event.altKey) modifiers.push('alt');
       if (event.metaKey) modifiers.push('cmd');
-      
+
       const key = event.key.toLowerCase();
       const keyCombo = [...modifiers, key].join('+');
-      console.log('Pressed key combo:', keyCombo);
 
       // Find matching keybinding
       const keybinding = keybindings.find(kb => {
         const keys = kb.key.toLowerCase().split(' ');
-        const matches = keys[0] === keyCombo;
-        if (keyCombo === 'ctrl+b') {
-          console.log('Found ctrl+b keybinding:', kb);
-        }
-        console.log('Checking keybinding:', kb.key, 'matches  :', matches);
-        return matches;
+        return keys[0] === keyCombo;
       });
 
       if (keybinding?.command) {
-        console.log('Found keybinding:', keybinding);
         // Stop the event immediately
         event.preventDefault();
         event.stopPropagation();
 
-        // Execute handler if it exists
-        const handler = handlerRef.current[keybinding.command];
-        if (handler) {
-          console.log('Executing handler for command:', keybinding.command);
-          handler(keybinding.args);
-        } else {
-          console.log('No handler found for command:', keybinding.command);
-        }
-      } else {
-        console.log('No keybinding found for combo:', keyCombo);
+        // Execute command through the registry
+        executeCommand(keybinding.command, keybinding.args);
       }
     };
 
     // Use capture phase to intercept events before they reach Monaco
     window.addEventListener('keydown', handleKeyEvent, true);
     return () => window.removeEventListener('keydown', handleKeyEvent, true);
-  }, [keybindings]);
+  }, [keybindings, executeCommand]);
 }

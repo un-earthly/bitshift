@@ -6,6 +6,7 @@ import FileTree from './FileTree';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
+import { ScrollArea } from './ui/scroll-area';
 import {
     RefreshCw,
     FileIcon,
@@ -181,26 +182,8 @@ export const FileTreeContainer: React.FC<FileTreeContainerProps> = ({
 
     return (
         <div className="relative flex flex-col h-full bg-background">
-            <div className="flex items-center justify-between p-2 border-b">
-                <div className="flex items-center gap-2">
-                    <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                        EXPLORER
-                        <ChevronDown className="h-3 w-3" />
-                    </h2>
-                </div>
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    className={cn(
-                        "h-7 w-7 hover:bg-accent",
-                        isLoading && "animate-spin"
-                    )}
-                    onClick={handleIndexWorkspace}
-                >
-                    <RefreshCw className="h-4 w-4" />
-                </Button>
-            </div>
-            <div className="flex items-center justify-between p-2 border-b">
+
+            <div className="flex-none flex items-center justify-between p-2 border-b">
                 <div className="flex items-center gap-1">
                     <Button
                         variant="ghost"
@@ -222,17 +205,16 @@ export const FileTreeContainer: React.FC<FileTreeContainerProps> = ({
                     </Button>
                 </div>
             </div>
-            <div className="flex-1 overflow-auto">
-                <div className="p-2">
-                    <FileTree
-                        nodes={nodes}
-                        onFileClick={handleFileClick}
-                        onFolderClick={handleFolderClick}
-                        onRename={handleRename}
-                        onDelete={handleDelete}
-                        onMove={handleMove}
-                    />
-                </div>
+
+            <div className="p-2 h-[calc(100vh-100px)] overflow-auto">
+                <FileTree
+                    nodes={nodes}
+                    onFileClick={handleFileClick}
+                    onFolderClick={handleFolderClick}
+                    onRename={handleRename}
+                    onDelete={handleDelete}
+                    onMove={handleMove}
+                />
             </div>
 
             {/* New File Dialog */}

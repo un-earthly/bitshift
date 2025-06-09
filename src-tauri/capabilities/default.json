@@ -32,7 +32,19 @@
     "fs:write-all",
     "fs:read-all",
     "shell:default",
+    "shell:allow-spawn",
     "core:window:allow-destroy",
+    "shell:allow-kill",
+    "shell:allow-stdin-write",
+    "shell:allow-execute",
+    "shell:allow-open",
+    {
+      "identifier": "fs:scope",
+      "allow": [
+        "**/*"
+      ],
+      "requireLiteralLeadingDot": false
+    },
     {
       "identifier": "shell:allow-spawn",
       "allow": [
@@ -377,6 +389,7 @@
           "sidecar": true
         }
       ]
-    }
+    },
+    "os:default"
   ]
 }

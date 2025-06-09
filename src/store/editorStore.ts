@@ -14,170 +14,213 @@ interface EditorPane {
 
 interface EditorLayout {
     direction: 'horizontal' | 'vertical';
-    sizes: number[];
     panes: EditorPane[];
+    sizes: number[];
 }
 
 interface EditorStore {
     layout: EditorLayout;
     activePane: string | null;
     openFile: (filePath: string, content: string) => void;
-    closeTab: (paneId: string, tabId: string) => void;
     setActiveTab: (paneId: string, tabId: string) => void;
-    splitPane: (paneId: string, direction: 'horizontal' | 'vertical') => void;
+    closeTab: (paneId: string, tabId: string) => void;
+    closeAllTabs: () => void;
+    closeTabsInPane: (paneId: string) => void;
     closePane: (paneId: string) => void;
+    closeAllPanes: () => void;
+    splitPane: (paneId: string, direction: 'horizontal' | 'vertical') => void;
     updateContent: (paneId: string, tabId: string, content: string) => void;
 }
 
-export const useEditorStore = create<EditorStore>((set, get) => ({
+export const useEditorStore = create<EditorStore>((set) => ({
     layout: {
         direction: 'horizontal',
-        sizes: [100],
         panes: [{
-            id: 'main',
+            id: 'default',
             tabs: [],
             activeTabId: null
-        }]
+        }],
+        sizes: [100]
     },
-    activePane: 'main',
+    activePane: 'default',
 
-    openFile: (filePath: string, content: string) => {
-        set(state => {
-            const activePane = state.activePane || 'main';
-            const panes = [...state.layout.panes];
-            const paneIndex = panes.findIndex(p => p.id === activePane);
+    openFile: (filePath, content) => set(state => {
+        const paneId = state.activePane || 'default';
+        const pane = state.layout.panes.find(p => p.id === paneId);
 
-            if (paneIndex === -1) return state;
+        if (!pane) return state;
 
-            const pane = panes[paneIndex];
-            const existingTab = pane.tabs.find(t => t.filePath === filePath);
-
-            if (existingTab) {
-                pane.activeTabId = existingTab.id;
-                return { ...state, layout: { ...state.layout, panes } };
-            }
-
-            const newTab: EditorTab = {
-                id: `${Date.now()}`,
-                filePath,
-                content
+        // Check if file is already open in this pane
+        const existingTab = pane.tabs.find(t => t.filePath === filePath);
+        if (existingTab) {
+            return {
+                layout: {
+                    ...state.layout,
+                    panes: state.layout.panes.map(p =>
+                        p.id === paneId
+                            ? { ...p, activeTabId: existingTab.id }
+                            : p
+                    )
+                }
             };
+        }
 
-            pane.tabs.push(newTab);
-            pane.activeTabId = newTab.id;
+        // Create new tab
+        const newTab: EditorTab = {
+            id: `${Date.now()}`,
+            filePath,
+            content
+        };
 
-            return { ...state, layout: { ...state.layout, panes } };
-        });
-    },
-
-    closeTab: (paneId: string, tabId: string) => {
-        set(state => {
-            const panes = [...state.layout.panes];
-            const paneIndex = panes.findIndex(p => p.id === paneId);
-
-            if (paneIndex === -1) return state;
-
-            const pane = panes[paneIndex];
-            const tabIndex = pane.tabs.findIndex(t => t.id === tabId);
-
-            if (tabIndex === -1) return state;
-
-            pane.tabs.splice(tabIndex, 1);
-
-            if (pane.activeTabId === tabId) {
-                pane.activeTabId = pane.tabs[Math.min(tabIndex, pane.tabs.length - 1)]?.id || null;
+        return {
+            layout: {
+                ...state.layout,
+                panes: state.layout.panes.map(p =>
+                    p.id === paneId
+                        ? {
+                            ...p,
+                            tabs: [...p.tabs, newTab],
+                            activeTabId: newTab.id
+                        }
+                        : p
+                )
             }
+        };
+    }),
 
-            return { ...state, layout: { ...state.layout, panes } };
-        });
-    },
+    setActiveTab: (paneId, tabId) => set(state => ({
+        layout: {
+            ...state.layout,
+            panes: state.layout.panes.map(pane =>
+                pane.id === paneId
+                    ? { ...pane, activeTabId: tabId }
+                    : pane
+            )
+        },
+        activePane: paneId
+    })),
 
-    setActiveTab: (paneId: string, tabId: string) => {
-        set(state => {
-            const panes = [...state.layout.panes];
-            const paneIndex = panes.findIndex(p => p.id === paneId);
+    closeTab: (paneId, tabId) => set(state => ({
+        layout: {
+            ...state.layout,
+            panes: state.layout.panes.map(pane =>
+                pane.id === paneId
+                    ? {
+                        ...pane,
+                        tabs: pane.tabs.filter(tab => tab.id !== tabId),
+                        activeTabId: pane.activeTabId === tabId
+                            ? pane.tabs[pane.tabs.findIndex(t => t.id === tabId) - 1]?.id || pane.tabs[0]?.id || null
+                            : pane.activeTabId
+                    }
+                    : pane
+            )
+        }
+    })),
 
-            if (paneIndex === -1) return state;
-
-            panes[paneIndex].activeTabId = tabId;
-            return { ...state, layout: { ...state.layout, panes }, activePane: paneId };
-        });
-    },
-
-    splitPane: (paneId: string, direction: 'horizontal' | 'vertical') => {
-        set(state => {
-            const panes = [...state.layout.panes];
-            const paneIndex = panes.findIndex(p => p.id === paneId);
-
-            if (paneIndex === -1) return state;
-
-            const newPane: EditorPane = {
-                id: `pane-${Date.now()}`,
+    closeAllTabs: () => set(state => ({
+        layout: {
+            ...state.layout,
+            panes: state.layout.panes.map(pane => ({
+                ...pane,
                 tabs: [],
                 activeTabId: null
-            };
+            }))
+        }
+    })),
 
-            panes.splice(paneIndex + 1, 0, newPane);
+    closeTabsInPane: (paneId) => set(state => ({
+        layout: {
+            ...state.layout,
+            panes: state.layout.panes.map(pane =>
+                pane.id === paneId
+                    ? { ...pane, tabs: [], activeTabId: null }
+                    : pane
+            )
+        }
+    })),
 
-            const sizes = state.layout.sizes;
-            const newSize = sizes[paneIndex] / 2;
-            sizes[paneIndex] = newSize;
-            sizes.splice(paneIndex + 1, 0, newSize);
+    closePane: (paneId) => set(state => {
+        const paneIndex = state.layout.panes.findIndex(p => p.id === paneId);
+        if (paneIndex === -1 || state.layout.panes.length <= 1) return state;
 
-            return {
-                ...state,
-                layout: {
-                    ...state.layout,
-                    direction,
-                    sizes,
-                    panes
-                },
-                activePane: newPane.id
-            };
-        });
-    },
+        const newSizes = [...state.layout.sizes];
+        const removedSize = newSizes.splice(paneIndex, 1)[0];
 
-    closePane: (paneId: string) => {
-        set(state => {
-            const panes = [...state.layout.panes];
-            const paneIndex = panes.findIndex(p => p.id === paneId);
+        // Distribute the removed pane's size among remaining panes
+        const sizePerPane = removedSize / newSizes.length;
+        newSizes.forEach((_, i) => newSizes[i] += sizePerPane);
 
-            if (paneIndex === -1 || panes.length === 1) return state;
+        const remainingPanes = state.layout.panes.filter(p => p.id !== paneId);
+        const newActivePane = remainingPanes[Math.max(0, paneIndex - 1)].id;
 
-            panes.splice(paneIndex, 1);
-            const sizes = [...state.layout.sizes];
-            const removedSize = sizes.splice(paneIndex, 1)[0];
+        return {
+            layout: {
+                ...state.layout,
+                panes: remainingPanes,
+                sizes: newSizes
+            },
+            activePane: newActivePane
+        };
+    }),
 
-            if (sizes.length > 0) {
-                sizes[0] += removedSize;
-            }
+    closeAllPanes: () => set(() => ({
+        layout: {
+            direction: 'horizontal',
+            panes: [{
+                id: 'default',
+                tabs: [],
+                activeTabId: null
+            }],
+            sizes: [100]
+        },
+        activePane: 'default'
+    })),
 
-            return {
-                ...state,
-                layout: {
-                    ...state.layout,
-                    sizes,
-                    panes
-                },
-                activePane: panes[Math.max(0, paneIndex - 1)].id
-            };
-        });
-    },
+    splitPane: (paneId, direction) => set(state => {
+        const paneIndex = state.layout.panes.findIndex(p => p.id === paneId);
+        if (paneIndex === -1) return state;
 
-    updateContent: (paneId: string, tabId: string, content: string) => {
-        set(state => {
-            const panes = [...state.layout.panes];
-            const paneIndex = panes.findIndex(p => p.id === paneId);
+        const newPaneId = `pane-${Date.now()}`;
+        const newPane: EditorPane = {
+            id: newPaneId,
+            tabs: [],
+            activeTabId: null
+        };
 
-            if (paneIndex === -1) return state;
+        const newPanes = [...state.layout.panes];
+        newPanes.splice(paneIndex + 1, 0, newPane);
 
-            const pane = panes[paneIndex];
-            const tab = pane.tabs.find(t => t.id === tabId);
+        const newSizes = [...state.layout.sizes];
+        const splitSize = newSizes[paneIndex] / 2;
+        newSizes[paneIndex] = splitSize;
+        newSizes.splice(paneIndex + 1, 0, splitSize);
 
-            if (!tab) return state;
+        return {
+            layout: {
+                ...state.layout,
+                direction: direction,
+                panes: newPanes,
+                sizes: newSizes
+            },
+            activePane: newPaneId
+        };
+    }),
 
-            tab.content = content;
-            return { ...state, layout: { ...state.layout, panes } };
-        });
-    }
+    updateContent: (paneId, tabId, content) => set(state => ({
+        layout: {
+            ...state.layout,
+            panes: state.layout.panes.map(pane =>
+                pane.id === paneId
+                    ? {
+                        ...pane,
+                        tabs: pane.tabs.map(tab =>
+                            tab.id === tabId
+                                ? { ...tab, content }
+                                : tab
+                        )
+                    }
+                    : pane
+            )
+        }
+    }))
 }));

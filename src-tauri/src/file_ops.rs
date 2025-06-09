@@ -102,22 +102,20 @@ pub async fn move_item(source: String, destination: String) -> FileOpResult {
 
     // If rename fails (e.g., across devices), try copy + delete
     match copy(source.clone(), destination).await {
-        FileOpResult { success: true, .. } => {
-            match remove(source).await {
-                FileOpResult { success: true, .. } => {
-                    FileOpResult::success("Successfully moved file/folder")
-                }
-                FileOpResult { message, .. } => {
-                    FileOpResult::error(&format!("Copied but failed to remove source: {}", message))
-                }
+        FileOpResult { success: true, .. } => match remove(source).await {
+            FileOpResult { success: true, .. } => {
+                FileOpResult::success("Successfully moved file/folder")
             }
-        }
+            FileOpResult { message, .. } => {
+                FileOpResult::error(&format!("Copied but failed to remove source: {}", message))
+            }
+        },
         FileOpResult { message, .. } => FileOpResult::error(&message),
     }
 }
 
 #[command]
-pub async fn index_workspace(workspace_path: String) -> FileOpResult {
+pub async fn index_workspace(_workspace_path: String) -> FileOpResult {
     // This is just a placeholder - the actual implementation would be in your AI service
     FileOpResult::success("Workspace indexing initiated")
-} 
+}

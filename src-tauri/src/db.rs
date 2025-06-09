@@ -1,7 +1,7 @@
-use duckdb::{Connection};
-use tauri::{AppHandle, Manager};
+use duckdb::Connection;
 use std::fs;
 use std::sync::{Arc, Mutex};
+use tauri::{AppHandle, Manager};
 
 #[derive(serde::Serialize, Debug)]
 pub struct Message {
@@ -36,8 +36,8 @@ impl Database {
             )
             .map_err(|e| e.to_string())?;
 
-        Ok(Database { 
-            duckdb_conn: Arc::new(Mutex::new(duckdb_conn))
+        Ok(Database {
+            duckdb_conn: Arc::new(Mutex::new(duckdb_conn)),
         })
     }
 
@@ -56,7 +56,7 @@ impl Database {
         .map(|_| ())
         .map_err(|e| e.to_string())
     }
-    
+
     pub fn update_message_response(&self, id: &str, response: &str) -> Result<(), String> {
         let conn = self.duckdb_conn.lock().map_err(|e| e.to_string())?;
         conn.execute(
@@ -75,20 +75,20 @@ impl Database {
         let rows = stmt
             .query_map([session_id], |row| {
                 Ok(Message {
-                    id: row.get(0)?, // VARCHAR -> String
+                    id: row.get(0)?,         // VARCHAR -> String
                     session_id: row.get(1)?, // VARCHAR -> String
-                    message: row.get(2)?, // VARCHAR -> String
-                    response: row.get(3)?, // VARCHAR -> String
-                    timestamp: row.get(4)?, // Now CAST to VARCHAR -> String
+                    message: row.get(2)?,    // VARCHAR -> String
+                    response: row.get(3)?,   // VARCHAR -> String
+                    timestamp: row.get(4)?,  // Now CAST to VARCHAR -> String
                 })
             })
             .map_err(|e| e.to_string())?
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| e.to_string())?;
-    
+
         // Log the entire result
         println!("Chat history for session {}: {:?}", session_id, rows);
-    
+
         // Log individual messages
         for msg in &rows {
             println!(
@@ -96,10 +96,10 @@ impl Database {
                 msg.id, msg.session_id, msg.message, msg.response, msg.timestamp
             );
         }
-    
+
         Ok(rows)
     }
-    
+
     pub fn get_sessions(&self) -> Result<Vec<String>, String> {
         let conn = self.duckdb_conn.lock().map_err(|e| e.to_string())?;
         let mut stmt = conn

@@ -187,7 +187,7 @@ const FileTree: React.FC<FileTreeProps> = ({
     e.preventDefault();
     const sourcePath = e.dataTransfer.getData('text/plain');
     const targetNode = nodes.find(n => n.path === targetPath);
-    
+
     if (!targetNode?.is_dir || sourcePath === targetPath) return;
 
     const newPath = targetPath + '/' + sourcePath.split('/').pop();
@@ -196,7 +196,7 @@ const FileTree: React.FC<FileTreeProps> = ({
     } catch (err) {
       console.error('Failed to move item:', err);
     }
-    
+
     setDraggedItem(null);
     setDropTarget(null);
   };
@@ -252,11 +252,11 @@ const FileTree: React.FC<FileTreeProps> = ({
             >
               {node.is_dir ? (
                 <>
-                  <ChevronRight 
+                  <ChevronRight
                     className={cn(
                       "h-4 w-4 transition-transform shrink-0",
                       expandedPaths.has(node.path) && "transform rotate-90"
-                    )} 
+                    )}
                   />
                   {renderIcon(node)}
                   <span className="truncate">{node.name}</span>
