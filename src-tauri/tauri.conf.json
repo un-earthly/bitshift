@@ -120,6 +120,9 @@
     },
     "window": {
       "additionalWindows": true
+    },
+    "shell": {
+      "open": true
     }
   }
 }

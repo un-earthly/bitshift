@@ -8,6 +8,8 @@ mod db;
 use db::Database;
 mod file_ops;
 use file_ops::{copy, create_dir, index_workspace, move_item, remove, rename};
+mod terminal;
+use terminal::{start_pty, write_to_pty};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct FrontendMessage {
@@ -239,7 +241,9 @@ pub fn run() {
             create_dir,
             copy,
             move_item,
-            index_workspace
+            index_workspace,
+            start_pty,
+            write_to_pty
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

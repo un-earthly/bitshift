@@ -46,6 +46,47 @@
       "requireLiteralLeadingDot": false
     },
     {
+      "identifier": "shell:allow-execute",
+      "allow": [
+        {
+          "name": "exec-sh",
+          "cmd": "sh",
+          "args": [
+            "-c",
+            {
+              "validator": "\\S+"
+            }
+          ]
+        },
+        {
+          "name": "exec-bash",
+          "cmd": "bash",
+          "args": [
+            "--login"
+          ]
+        },
+        {
+          "name": "exec-zsh",
+          "cmd": "zsh",
+          "args": [
+            "-l"
+          ]
+        },
+        {
+          "name": "exec-git-bash",
+          "cmd": "C:\\Program Files\\Git\\bin\\bash.exe",
+          "args": [
+            "--login"
+          ]
+        },
+        {
+          "name": "exec-cmd",
+          "cmd": "cmd.exe",
+          "args": []
+        }
+      ]
+    },
+    {
       "identifier": "shell:allow-spawn",
       "allow": [
         {

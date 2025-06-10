@@ -100,22 +100,43 @@ export const useEditorStore = create<EditorStore>((set) => ({
         activePane: paneId
     })),
 
-    closeTab: (paneId, tabId) => set(state => ({
-        layout: {
-            ...state.layout,
-            panes: state.layout.panes.map(pane =>
-                pane.id === paneId
-                    ? {
-                        ...pane,
-                        tabs: pane.tabs.filter(tab => tab.id !== tabId),
-                        activeTabId: pane.activeTabId === tabId
-                            ? pane.tabs[pane.tabs.findIndex(t => t.id === tabId) - 1]?.id || pane.tabs[0]?.id || null
-                            : pane.activeTabId
-                    }
-                    : pane
-            )
+    closeTab: (paneId, tabId) => set(state => {
+        const pane = state.layout.panes.find(p => p.id === paneId);
+        if (!pane) return state;
+
+        const tabIndex = pane.tabs.findIndex(t => t.id === tabId);
+        const remainingTabs = pane.tabs.filter(tab => tab.id !== tabId);
+
+        // Determine the new active tab
+        let newActiveTabId = null;
+        if (pane.activeTabId === tabId) {
+            // If we're closing the active tab, try to activate the previous tab,
+            // if not available, try the next tab, if not available, null
+            if (tabIndex > 0) {
+                newActiveTabId = remainingTabs[tabIndex - 1].id;
+            } else if (remainingTabs.length > 0) {
+                newActiveTabId = remainingTabs[0].id;
+            }
+        } else {
+            // If we're not closing the active tab, keep the current active tab
+            newActiveTabId = pane.activeTabId;
         }
-    })),
+
+        return {
+            layout: {
+                ...state.layout,
+                panes: state.layout.panes.map(p =>
+                    p.id === paneId
+                        ? {
+                            ...p,
+                            tabs: remainingTabs,
+                            activeTabId: newActiveTabId
+                        }
+                        : p
+                )
+            }
+        };
+    }),
 
     closeAllTabs: () => set(state => ({
         layout: {
