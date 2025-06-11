@@ -1,4 +1,3 @@
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 use serde::{Deserialize, Serialize};
 use std::time::SystemTime;
 use std::{fs, path::PathBuf};
@@ -9,7 +8,7 @@ use db::Database;
 mod file_ops;
 use file_ops::{copy, create_dir, index_workspace, move_item, remove, rename};
 mod terminal;
-use terminal::{start_pty, write_to_pty};
+pub use terminal::{start_pty, write_to_pty, PtyState};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct FrontendMessage {
@@ -175,6 +174,12 @@ pub fn run() {
             let handle = app.handle();
             let db = db::Database::init(&handle).expect("Failed to initialize database");
             app.manage(db);
+
+            // Initialize terminal state
+            app.manage(PtyState {
+                pty: std::sync::Mutex::new(None),
+            });
+
             let app_data_dir = app
                 .path()
                 .app_data_dir()
@@ -243,7 +248,7 @@ pub fn run() {
             move_item,
             index_workspace,
             start_pty,
-            write_to_pty
+            write_to_pty,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
