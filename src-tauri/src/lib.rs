@@ -1,10 +1,18 @@
 mod chat;
+mod commands;
+mod config;
 mod db;
 mod file_ops;
+mod llm;
+mod models;
+mod scraper;
 mod setup;
 mod terminal;
-
-use chat::{get_chat_history, get_sessions, insert_message, update_message_response};
+use chat::{
+    get_chat_history, get_sessions, insert_message, update_message_response, update_session_title,
+};
+use commands::initialize_project;
+use config::{get_project_directory_command, set_project_directory};
 use file_ops::{
     copy, create_dir, index_workspace, move_item, read_dir_metadata, read_file_metadata, remove,
     rename,
@@ -36,11 +44,17 @@ pub fn run() {
             get_chat_history,
             get_sessions,
             update_message_response,
+            update_session_title,
             // Terminal operations
             start_pty,
             write_to_pty,
             close_pty,
             resize_pty,
+            // Project initialization
+            initialize_project,
+            // Configuration management
+            get_project_directory_command,
+            set_project_directory,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

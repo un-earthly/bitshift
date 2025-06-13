@@ -6,8 +6,8 @@ use tauri::command;
 
 #[derive(Debug, serde::Serialize)]
 pub struct FileOpResult {
-    success: bool,
-    message: String,
+    pub success: bool,
+    pub message: String,
 }
 
 impl FileOpResult {

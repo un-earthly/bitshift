@@ -1,4 +1,4 @@
-use crate::{db::Database, terminal::PtyState};
+use crate::{config::get_project_directory, db::Database, terminal::PtyState};
 use std::collections::HashMap;
 use std::sync::Mutex;
 use tauri::Manager;
@@ -24,6 +24,8 @@ pub fn setup_app(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
     if !models_dir.exists() {
         std::fs::create_dir_all(&models_dir).expect("Failed to create models directory");
     }
+
+    get_project_directory(&handle)?;
 
     let fs_scope = app.fs_scope();
 

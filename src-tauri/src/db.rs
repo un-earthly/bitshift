@@ -32,7 +32,13 @@ impl Database {
                     response VARCHAR,
                     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
-                CREATE INDEX IF NOT EXISTS idx_session ON messages (session_id);",
+                CREATE INDEX IF NOT EXISTS idx_session ON messages (session_id);
+                
+                CREATE TABLE IF NOT EXISTS chat_sessions (
+                    session_id VARCHAR PRIMARY KEY,
+                    title VARCHAR,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );",
             )
             .map_err(|e| e.to_string())?;
 
@@ -100,16 +106,30 @@ impl Database {
         Ok(rows)
     }
 
-    pub fn get_sessions(&self) -> Result<Vec<String>, String> {
+    pub fn update_session_title(&self, session_id: &str, title: &str) -> Result<(), String> {
+        let conn = self.duckdb_conn.lock().map_err(|e| e.to_string())?;
+        conn.execute(
+            "INSERT INTO chat_sessions (session_id, title) 
+             VALUES (?, ?) 
+             ON CONFLICT (session_id) DO UPDATE SET title = EXCLUDED.title",
+            &[session_id, title],
+        )
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+    }
+
+    pub fn get_session_info(&self) -> Result<Vec<(String, String)>, String> {
         let conn = self.duckdb_conn.lock().map_err(|e| e.to_string())?;
         let mut stmt = conn
-            .prepare("SELECT DISTINCT session_id FROM messages ORDER BY session_id")
+            .prepare("SELECT session_id, title FROM chat_sessions ORDER BY created_at DESC")
             .map_err(|e| e.to_string())?;
+
         let rows = stmt
-            .query_map([], |row| row.get::<_, String>(0))
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
             .map_err(|e| e.to_string())?
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| e.to_string())?;
+
         Ok(rows)
     }
 }
