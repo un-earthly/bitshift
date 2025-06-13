@@ -17,6 +17,10 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { useChatState } from '@/hooks/useChatState';
+import { appDataDir, join } from '@tauri-apps/api/path';
+import { create, exists, readDir } from '@tauri-apps/plugin-fs';
+import { ModelInfo } from '@/services/modelManager';
 
 interface ProjectInitDialogProps {
     open: boolean;
@@ -41,7 +45,6 @@ export function ProjectInitDialog({ open, onOpenChange }: ProjectInitDialogProps
     const [isLoading, setIsLoading] = useState(false);
     const [currentStep, setCurrentStep] = useState<number>(0);
     const [steps, setSteps] = useState<ProjectStep[]>([]);
-
     useEffect(() => {
         const unsubscribe = listen<ProjectProgress>('project_progress', (event) => {
             const { step, current_step } = event.payload;
@@ -58,6 +61,54 @@ export function ProjectInitDialog({ open, onOpenChange }: ProjectInitDialogProps
         };
     }, []);
 
+    const { handleModelSelection, availableModels } = useChatState();
+    useEffect(() => {
+        async function checkAndLoadFirstModel(): Promise<string | null> {
+            try {
+                const appData = await appDataDir();
+                const modelsDir = await join(appData, 'models');
+                const modlExists = await exists(modelsDir);
+
+                if (!modlExists) {
+                    await create(modelsDir);
+                    console.log('Created models directory:', modelsDir);
+                    return null;
+                }
+
+                const entries = await readDir(modelsDir);
+                const ggufFiles = entries.filter(entry => entry.name.endsWith('.gguf'));
+
+                if (ggufFiles.length > 0) {
+                    const firstModel = ggufFiles[0].name;
+                    const model = availableModels.find(m => m.name === firstModel);
+                    if (!model) {
+                        console.error('Model not found in available models:', firstModel);
+                    }
+                    await handleModelSelection(model as ModelInfo);
+                    console.log('Loaded first model:', firstModel);
+                    return firstModel;
+                } else {
+                    console.log('No .gguf files found in models directory');
+                    return null;
+                }
+
+            } catch (error) {
+                console.error('Error checking or loading first model:', error);
+                throw error;
+            }
+        }
+        checkAndLoadFirstModel().then(model => {
+            if (model) {
+                setPrompt(`Initialize a project using the model: ${model}`);
+            } else {
+                setPrompt('Please provide a prompt to initialize your project.');
+            }
+        }
+        ).catch(error => {
+            console.error('Error during model initialization:', error);
+            setPrompt('Failed to load model. Please check your setup.');
+        });
+    }, [])
     const handleInitialize = async () => {
         if (!prompt.trim()) return;
 

@@ -54,10 +54,6 @@ async fn fetch_llm_response(prompt: &str) -> Result<String, String> {
         .json(&serde_json::json!({
             "messages": [
                 {
-                    "role": "system",
-                    "content": "You are a helpful assistant that generates concise, descriptive titles."
-                },
-                {
                     "role": "user",
                     "content": prompt
                 }
