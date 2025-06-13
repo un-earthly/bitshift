@@ -20,6 +20,26 @@
   padding: 20px;
   overflow-y: auto;
   max-height: calc(100vh - 120px);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(155, 155, 155, 0.5) transparent;
+}
+
+.scroll-view::-webkit-scrollbar {
+  width: 8px;
+}
+
+.scroll-view::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scroll-view::-webkit-scrollbar-thumb {
+  background-color: rgba(155, 155, 155, 0.5);
+  border-radius: 4px;
+  border: 2px solid transparent;
+}
+
+.scroll-view::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(155, 155, 155, 0.7);
 }
 
 /* Title */
@@ -423,28 +443,28 @@
   .scroll-view {
     padding: 16px;
   }
-  
+
   .card {
     padding: 16px;
   }
-  
+
   .title {
     font-size: 24px;
   }
-  
+
   .message-bubble {
     max-width: 90%;
   }
-  
+
   .input-row {
     flex-direction: column;
     gap: 8px;
   }
-  
+
   .input {
     width: 100%;
   }
-  
+
   .send-button,
   .stop-button {
     width: 100%;
@@ -587,8 +607,13 @@
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .download-status {

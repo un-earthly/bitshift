@@ -37,7 +37,7 @@ interface ChatState {
   autoScrollEnabled: boolean;
   downloadedModels: string[];
   currentSessionId: string;
-  
+
   // Actions
   setContext: (context: boolean) => void;
   setConversation: (conversation: Message[]) => void;
@@ -50,18 +50,18 @@ interface ChatState {
   addMessage: (message: Message) => void;
   updateLastMessage: (content: string) => void;
   setIsGenerating: (isGenerating: boolean) => void;
-  
+
   // Async Actions
   fetchAvailableModels: () => Promise<void>;
   loadModel: (modelName: string) => Promise<boolean>;
   handleSendMessage: () => Promise<void>;
   stopGeneration: () => Promise<void>;
   handleModelSelection: (model: ModelInfo) => Promise<void>;
-  
+
   // New actions
   loadChatHistory: (sessionId: string) => Promise<void>;
   createNewSession: () => void;
-  getSessions: () => Promise<string[]>;
+  getSessions: () => Promise<Array<{ id: string; title: string }>>;
 }
 
 const INITIAL_CONVERSATION: Message[] = [
@@ -124,7 +124,7 @@ const useChatStoreImpl = create<ChatState>((set, get) => ({
       }
       const localDataDir = await appLocalDataDir();
       const fullPath = await join(localDataDir, 'models', modelName);
-      
+
       await llmService.loadModel(fullPath);
 
       set({ context: true, isLoading: false });
@@ -217,9 +217,9 @@ const useChatStoreImpl = create<ChatState>((set, get) => ({
   },
 
   createNewSession: () => {
-    set({ 
+    set({
       currentSessionId: uuidv4(),
-      conversation: INITIAL_CONVERSATION 
+      conversation: INITIAL_CONVERSATION
     });
   },
 
@@ -227,7 +227,7 @@ const useChatStoreImpl = create<ChatState>((set, get) => ({
     try {
       const messages = await invoke<Message[]>('get_chat_history', { sessionId });
       console.log('Loaded chat history:', messages);
-      set({ 
+      set({
         currentSessionId: sessionId,
         conversation: [...INITIAL_CONVERSATION, ...messages]
       });
@@ -238,7 +238,8 @@ const useChatStoreImpl = create<ChatState>((set, get) => ({
 
   getSessions: async () => {
     try {
-      return await invoke<string[]>('get_sessions');
+      const sessions = await invoke<Array<{ id: string; title: string }>>('get_sessions');
+      return sessions;
     } catch (error) {
       console.error('Failed to get sessions:', error);
       return [];

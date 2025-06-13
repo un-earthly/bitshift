@@ -49,7 +49,7 @@ export const LlamaChat: React.FC<LlamaChatProps> = ({
     getSessions,
   } = useChatState();
 
-  const [sessions, setSessions] = React.useState<string[]>([]);
+  const [sessions, setSessions] = React.useState<Array<{ id: string; title: string }>>([]);
   const [error, setError] = React.useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -63,11 +63,19 @@ export const LlamaChat: React.FC<LlamaChatProps> = ({
   };
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messagesEndRef.current) {
+      const parent = messagesEndRef.current.parentElement?.parentElement;
+      if (parent) {
+        parent.scrollTop = parent.scrollHeight;
+      }
+    }
   };
 
   useEffect(() => {
-    scrollToBottom();
+    // Use requestAnimationFrame to ensure DOM is updated
+    requestAnimationFrame(() => {
+      scrollToBottom();
+    });
   }, [conversation]);
 
   const validateInput = (text: string) => {
@@ -136,9 +144,9 @@ export const LlamaChat: React.FC<LlamaChatProps> = ({
                 <SelectValue placeholder="Load chat history" />
               </SelectTrigger>
               <SelectContent className="bg-gray-950" >
-                {sessions.map((sessionId) => (
-                  <SelectItem key={sessionId} value={sessionId} >
-                    Chat {sessionId.slice(0, 8)}...
+                {sessions.map((session) => (
+                  <SelectItem key={session.id} value={session.id}>
+                    {session.title || `Chat ${session.id.slice(0, 8)}...`}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -187,8 +195,8 @@ export const LlamaChat: React.FC<LlamaChatProps> = ({
         </div>
       )}
 
-      <div className="flex-1 overflow-auto">
-        <div className="h-full space-y-4 p-4">
+      <div className="flex-1 overflow-y-auto" style={{ maxHeight: "calc(100vh - 240px)" }}>
+        <div className="space-y-4 p-4">
           {conversation.length <= 1 ? (
             <div className="flex h-32 items-center justify-center text-muted-foreground">
               <p>Select a model and start chatting!</p>
