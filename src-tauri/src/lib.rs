@@ -8,7 +8,9 @@ use db::Database;
 mod file_ops;
 use file_ops::{copy, create_dir, index_workspace, move_item, remove, rename};
 mod terminal;
-pub use terminal::{start_pty, write_to_pty, PtyState};
+use std::collections::HashMap;
+use std::sync::Mutex;
+pub use terminal::{close_pty, resize_pty, start_pty, write_to_pty, PtyState};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct FrontendMessage {
@@ -177,7 +179,7 @@ pub fn run() {
 
             // Initialize terminal state
             app.manage(PtyState {
-                pty: std::sync::Mutex::new(None),
+                ptys: Mutex::new(HashMap::new()),
             });
 
             let app_data_dir = app
@@ -249,6 +251,8 @@ pub fn run() {
             index_workspace,
             start_pty,
             write_to_pty,
+            close_pty,
+            resize_pty,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -2,15 +2,34 @@ import React, { useState, useEffect } from 'react';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { useEditorStore } from '@/store/editorStore';
 import EditorView from './EditorView';
-
 import { Button } from './ui/button';
-import { X, Maximize2, SplitSquareHorizontal, SplitSquareVertical, Terminal as TerminalIcon } from 'lucide-react';
+import {
+    X,
+    Maximize2,
+    SplitSquareHorizontal,
+    SplitSquareVertical,
+    Terminal as TerminalIcon,
+    Plus
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import TerminalComponent from './Terminal';
 import { useCommandRegistry } from '@/commands/registry';
+import { useTerminal } from '@/hooks/useTerminal';
+
+interface TerminalInstance {
+    id: string;
+}
 
 export const EditorLayout: React.FC = () => {
     const [isTerminalVisible, setIsTerminalVisible] = useState(false);
+    const [terminals, setTerminals] = useState<TerminalInstance[]>([]);
+    const [terminalPanels, setTerminalPanels] = useState<{
+        direction: 'horizontal' | 'vertical';
+        panels: string[][];
+    }>({
+        direction: 'horizontal',
+        panels: [[]]
+    });
     const {
         layout,
         closeTab,
@@ -24,11 +43,100 @@ export const EditorLayout: React.FC = () => {
     } = useEditorStore();
     const registerCommand = useCommandRegistry(state => state.registerCommand);
     const unregisterCommand = useCommandRegistry(state => state.unregisterCommand);
+    const { closeTerminal } = useTerminal();
+
+    const createTerminal = () => {
+        const id = `terminal-${Date.now()}`;
+        setTerminals(prev => [...prev, { id }]);
+
+        // Add to first available panel
+        setTerminalPanels(prev => ({
+            ...prev,
+            panels: prev.panels.length === 0
+                ? [[id]]
+                : prev.panels.map((panel, i) =>
+                    i === 0 ? [...panel, id] : panel
+                )
+        }));
+
+        setIsTerminalVisible(true);
+    };
+
+    // Close a specific terminal
+    const handleTerminalClose = async (id: string) => {
+        try {
+            await closeTerminal(id);
+            setTerminals(prev => prev.filter(t => t.id !== id));
+            setTerminalPanels(prev => ({
+                ...prev,
+                panels: prev.panels
+                    .map(panel => panel.filter(tid => tid !== id))
+                    .filter(panel => panel.length > 0)
+            }));
+
+            // Hide terminal panel if no terminals left
+            if (terminals.length <= 1) {
+                setIsTerminalVisible(false);
+            }
+        } catch (err) {
+            console.error('Failed to close terminal:', err);
+        }
+    };
+
+    // Split terminal panel
+    const splitTerminal = (direction: 'horizontal' | 'vertical') => {
+        const id = `terminal-${Date.now()}`;
+        setTerminals(prev => [...prev, { id }]);
+
+        setTerminalPanels(prev => {
+            if (direction === prev.direction) {
+                // Add to new panel in same direction
+                return {
+                    ...prev,
+                    panels: [...prev.panels, [id]]
+                };
+            } else {
+                // Change direction and create new panel
+                return {
+                    direction,
+                    panels: [[...prev.panels.flat()], [id]]
+                };
+            }
+        });
+
+        setIsTerminalVisible(true);
+    };
 
     useEffect(() => {
-        // Register panel/terminal commands
-        registerCommand('workbench.action.terminal.toggleTerminal', () => setIsTerminalVisible(prev => !prev));
-        registerCommand('workbench.action.togglePanel', () => setIsTerminalVisible(prev => !prev));
+        // Register terminal commands
+        registerCommand('workbench.action.togglePanel', () => {
+            if (!isTerminalVisible) {
+                if (terminals.length === 0) {
+                    createTerminal();
+                }
+                setIsTerminalVisible(true);
+            } else {
+                setIsTerminalVisible(false);
+            }
+        });
+        registerCommand('workbench.action.terminal.toggleTerminal', () => {
+            if (!isTerminalVisible) {
+                if (terminals.length === 0) {
+                    createTerminal();
+                }
+                setIsTerminalVisible(true);
+            } else {
+                setIsTerminalVisible(false);
+            }
+        });
+        registerCommand('workbench.action.terminal.split', () => splitTerminal('horizontal'));
+        registerCommand('workbench.action.terminal.splitVertical', () => splitTerminal('vertical'));
+        registerCommand('workbench.action.terminal.new', createTerminal);
+        registerCommand('workbench.action.terminal.kill', () => {
+            if (terminals.length > 0) {
+                handleTerminalClose(terminals[terminals.length - 1].id);
+            }
+        });
 
         // Register split editor commands
         registerCommand('workbench.action.splitEditor', (paneId: string) => splitPane(paneId, 'vertical'));
@@ -55,8 +163,11 @@ export const EditorLayout: React.FC = () => {
 
         // Cleanup on unmount
         return () => {
-            unregisterCommand('workbench.action.togglePanel');
             unregisterCommand('workbench.action.terminal.toggleTerminal');
+            unregisterCommand('workbench.action.terminal.split');
+            unregisterCommand('workbench.action.terminal.splitVertical');
+            unregisterCommand('workbench.action.terminal.new');
+            unregisterCommand('workbench.action.terminal.kill');
             unregisterCommand('workbench.action.splitEditor');
             unregisterCommand('workbench.action.splitEditorDown');
             unregisterCommand('workbench.action.closeActiveEditor');
@@ -65,7 +176,7 @@ export const EditorLayout: React.FC = () => {
             unregisterCommand('workbench.action.closeEditorsInGroup');
             unregisterCommand('workbench.action.closeGroup');
         };
-    }, [registerCommand, unregisterCommand, splitPane, closePane, closeTab, closeAllTabs, closeAllPanes, closeTabsInPane, layout.panes.length]);
+    }, [registerCommand, unregisterCommand, terminals.length, isTerminalVisible, splitPane, closePane, closeTab, closeAllTabs, closeAllPanes, closeTabsInPane, layout.panes.length]);
 
     const toggleTerminal = () => setIsTerminalVisible(prev => !prev);
 
@@ -158,9 +269,10 @@ export const EditorLayout: React.FC = () => {
     );
 
     return (
-        <PanelGroup direction="vertical" autoSaveId="editor-layout">
-            <Panel id="editor-main" defaultSize={70} minSize={30}>
-                <PanelGroup direction={layout.direction} className="h-full">
+        <PanelGroup direction="vertical">
+            {/* Editor Panels */}
+            <Panel id="editor" defaultSize={isTerminalVisible ? 70 : 100}>
+                <PanelGroup direction="horizontal">
                     {layout.panes.map((pane, index) => (
                         <React.Fragment key={pane.id}>
                             {index > 0 && (
@@ -178,17 +290,95 @@ export const EditorLayout: React.FC = () => {
                 </PanelGroup>
             </Panel>
 
+            {/* Terminal Panel */}
             {isTerminalVisible && (
                 <>
                     <PanelResizeHandle className="h-1.5 bg-border/40 hover:bg-border/60 transition-colors" />
-                    <Panel
-                        id="terminal"
-                        defaultSize={30}
-                        minSize={10}
-                        maxSize={70}
-                        order={2}
-                    >
-                        <TerminalComponent />
+                    <Panel id="terminal" defaultSize={30} minSize={10}>
+                        <div className="flex h-full flex-col bg-background">
+                            {/* Terminal Controls */}
+                            <div className="flex items-center justify-between border-b border-border/40 px-2 py-1">
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6"
+                                        onClick={() => createTerminal()}
+                                        title="New Terminal"
+                                    >
+                                        <Plus className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6"
+                                        onClick={() => splitTerminal('horizontal')}
+                                        title="Split Terminal Horizontally"
+                                    >
+                                        <SplitSquareHorizontal className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6"
+                                        onClick={() => splitTerminal('vertical')}
+                                        title="Split Terminal Vertically"
+                                    >
+                                        <SplitSquareVertical className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6"
+                                    onClick={() => setIsTerminalVisible(false)}
+                                    title="Close Terminal Panel"
+                                >
+                                    <X className="h-4 w-4" />
+                                </Button>
+                            </div>
+
+                            {/* Terminal Content */}
+                            <div className="flex-1 p-2">
+                                <PanelGroup direction={terminalPanels.direction}>
+                                    {terminalPanels.panels.map((panel, panelIndex) => (
+                                        <React.Fragment key={panelIndex}>
+                                            {panelIndex > 0 && (
+                                                <PanelResizeHandle className={cn(
+                                                    terminalPanels.direction === 'horizontal'
+                                                        ? "w-1.5 bg-border/40 hover:bg-border/60"
+                                                        : "h-1.5 bg-border/40 hover:bg-border/60",
+                                                    "transition-colors"
+                                                )} />
+                                            )}
+                                            <Panel>
+                                                <PanelGroup direction={terminalPanels.direction === 'horizontal' ? 'vertical' : 'horizontal'}>
+                                                    {panel.map((terminalId, terminalIndex) => (
+                                                        <React.Fragment key={terminalId}>
+                                                            {terminalIndex > 0 && (
+                                                                <PanelResizeHandle className={cn(
+                                                                    terminalPanels.direction === 'horizontal'
+                                                                        ? "h-1.5 bg-border/40 hover:bg-border/60"
+                                                                        : "w-1.5 bg-border/40 hover:bg-border/60",
+                                                                    "transition-colors"
+                                                                )} />
+                                                            )}
+                                                            <Panel>
+                                                                <TerminalComponent
+                                                                    key={terminalId}
+                                                                    id={terminalId}
+                                                                    onClose={() => handleTerminalClose(terminalId)}
+                                                                />
+                                                            </Panel>
+                                                        </React.Fragment>
+                                                    ))}
+                                                </PanelGroup>
+                                            </Panel>
+                                        </React.Fragment>
+                                    ))}
+                                </PanelGroup>
+                            </div>
+                        </div>
                     </Panel>
                 </>
             )}

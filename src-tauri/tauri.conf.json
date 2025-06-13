@@ -23,6 +23,7 @@
       "capabilities": []
     }
   },
+  
   "bundle": {
     "active": true,
     "targets": "all",

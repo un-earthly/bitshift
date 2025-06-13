@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { resolveResource } from '@tauri-apps/api/path';
 import { readTextFile } from '@tauri-apps/plugin-fs';
 import { useCommandRegistry } from '../commands/registry';
+import { useContextKeys } from '../commands/contextKeys';
 
 interface Keybinding {
   key: string;
@@ -76,6 +77,7 @@ export interface WorkbenchHandlers {
 export function useKeybindings() {
   const [keybindings, setKeybindings] = useState<Keybinding[]>([]);
   const executeCommand = useCommandRegistry(state => state.executeCommand);
+  const evaluateWhen = useContextKeys(state => state.evaluateWhen);
 
   useEffect(() => {
     // Load keybindings using Tauri's filesystem API
@@ -100,8 +102,17 @@ export function useKeybindings() {
 
   useEffect(() => {
     const handleKeyEvent = (event: KeyboardEvent) => {
-      // Build key combination string (e.g., "ctrl+k ctrl+c")
-      const modifiers = [];
+      // Skip if target is an input, textarea, or terminal is focused
+      if (
+        event.target instanceof HTMLInputElement ||
+        event.target instanceof HTMLTextAreaElement ||
+        evaluateWhen('terminalFocused') // Check if terminal is focused
+      ) {
+        return;
+      }
+
+      // Build key combo string
+      const modifiers: string[] = [];
       if (event.ctrlKey) modifiers.push('ctrl');
       if (event.shiftKey) modifiers.push('shift');
       if (event.altKey) modifiers.push('alt');
@@ -113,7 +124,7 @@ export function useKeybindings() {
       // Find matching keybinding
       const keybinding = keybindings.find(kb => {
         const keys = kb.key.toLowerCase().split(' ');
-        return keys[0] === keyCombo;
+        return keys[0] === keyCombo && (!kb.when || evaluateWhen(kb.when));
       });
 
       if (keybinding?.command) {
@@ -129,5 +140,5 @@ export function useKeybindings() {
     // Use capture phase to intercept events before they reach Monaco
     window.addEventListener('keydown', handleKeyEvent, true);
     return () => window.removeEventListener('keydown', handleKeyEvent, true);
-  }, [keybindings, executeCommand]);
+  }, [keybindings, executeCommand, evaluateWhen]);
 }

@@ -1,117 +1,189 @@
-import { useEffect, useRef, useState, useLayoutEffect } from 'react';
+// TerminalComp.tsx
+import { useEffect, useRef, useState } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { event } from '@tauri-apps/api';
-import { invoke } from '@tauri-apps/api/core';
+import { useContextKeys } from '@/commands/contextKeys';
+import { useTerminal } from '@/hooks/useTerminal';
 import 'xterm/css/xterm.css';
 
 interface PtyOutput {
     data: string;
+    id: string;
 }
 
-function TerminalComp() {
-    const terminalRef = useRef<HTMLDivElement>(null);
-    const term = useRef<Terminal | null>(null);
-    const fitAddon = useRef<FitAddon | null>(null);
+interface TerminalProps {
+    id: string;
+    onClose: () => void;
+}
+
+function TerminalComp({ id, onClose }: TerminalProps) {
     const [error, setError] = useState<string | null>(null);
+    const [isFocused, setIsFocused] = useState(false);
+    const [isPtyReady, setIsPtyReady] = useState(false);
+    const { setContext } = useContextKeys();
+    const terminalRef = useRef<HTMLDivElement>(null);
+    const term = useRef<Terminal>();
+    const fitAddon = useRef<FitAddon>();
+    const isInitialized = useRef(false);
+    const { startTerminal, writeToTerminal, closeTerminal, resizeTerminal } = useTerminal({
+        onError: setError,
+    });
 
-    // Initialize terminal
-    useEffect(() => {
-        if (!terminalRef.current) return;
-
-        term.current = new Terminal({
-            cursorBlink: true,
-            fontSize: 14,
-            theme: {
-                background: '#1e1e1e',
-                foreground: '#ffffff',
-                cursor: '#ffffff'
-            },
-            convertEol: true,
-            scrollback: 5000,
-            allowTransparency: true,
-        });
-
-        fitAddon.current = new FitAddon();
-        term.current.loadAddon(fitAddon.current);
-        
-        term.current.open(terminalRef.current);
-        
-        // Delay the fit operation to ensure the terminal is properly mounted
-        setTimeout(() => {
-            fitAddon.current?.fit();
-        }, 0);
-
-        // Start PTY process
-        invoke('start_pty')
-            .then(() => {
-                // Execute clear command after PTY starts
-                return invoke('write_to_pty', { data: 'clear\n' });
-            })
-            .catch((err) => {
-                console.error('Failed to start PTY:', err);
-                setError('Failed to start terminal process');
-            });
-
-        // Handle user input including special keys
-        term.current.onData((data) => {
-            // Handle special keys if needed
-            invoke('write_to_pty', { data })
-                .catch((err) => {
-                    console.error('Failed to write to PTY:', err);
-                    setError('Failed to send command to terminal');
-                });
-        });
-
-        // Handle PTY output
-        const unsubscribe = event.listen<PtyOutput>('pty_output', (event) => {
-            if (term.current) {
-                term.current.write(event.payload.data);
-            }
-        });
-
-        // Cleanup
-        return () => {
-            unsubscribe.then(f => f());
-            term.current?.dispose();
-        };
-    }, []);
-
-    // Handle window and container resizing
-    useLayoutEffect(() => {
-        if (!fitAddon.current) return;
-
-        const handleResize = () => {
+    const fitTerminal = () => {
+        if (fitAddon.current && term.current && isPtyReady) {
             try {
-                fitAddon.current?.fit();
+                fitAddon.current.fit();
+                const { rows, cols } = term.current;
+                term.current.resize(cols, rows);
+                console.log(`[TerminalComp] Fitting terminal ${id} to rows: ${rows}, cols: ${cols}`);
+                resizeTerminal(id, rows, cols).catch((err) => {
+                    console.error('Failed to resize PTY:', err);
+                    setError('Failed to resize terminal');
+                });
             } catch (err) {
-                console.error('Failed to resize terminal:', err);
+                console.error('Failed to fit terminal:', err);
+                setError('Failed to fit terminal');
+            }
+        }
+    };
+
+    useEffect(() => {
+        let isTerminalActive = true;
+
+        const initializeTerminal = async () => {
+            try {
+                if (isInitialized.current) {
+                    console.log(`[TerminalComp] Terminal ${id} already initialized, skipping`);
+                    return;
+                }
+                isInitialized.current = true;
+
+                term.current = new Terminal({
+                    fontFamily: 'monospace',
+                    fontSize: 14,
+                    theme: { background: '#1a1b26' },
+                    allowProposedApi: true,
+                    cursorBlink: true,
+                });
+
+                fitAddon.current = new FitAddon();
+                term.current.loadAddon(fitAddon.current);
+
+                if (!terminalRef.current || !isTerminalActive) return;
+
+                term.current.open(terminalRef.current);
+
+                const handleFocus = () => {
+                    setIsFocused(true);
+                    setContext('terminalFocused', true);
+                };
+
+                const handleBlur = () => {
+                    setIsFocused(false);
+                    setContext('terminalFocused', false);
+                };
+
+                term.current.element?.addEventListener('focus', handleFocus);
+                term.current.element?.addEventListener('blur', handleBlur);
+
+                const preventBubbling = (e: KeyboardEvent) => {
+                    if (isFocused) {
+                        e.stopPropagation();
+                    }
+                };
+
+                terminalRef.current.addEventListener('keydown', preventBubbling, true);
+                terminalRef.current.addEventListener('keyup', preventBubbling, true);
+
+                term.current.onData((data) => {
+                    if (isTerminalActive) {
+                        console.log(`[TerminalComp] User input for terminal ${id}:`, data);
+                        writeToTerminal(id, data).catch((err) => {
+                            console.error('Failed to write to PTY:', err);
+                            setError('Failed to send command to terminal');
+                        });
+                    }
+                });
+
+                await startTerminal(id);
+                if (!isTerminalActive) return;
+
+                const unsubscribePtyReady = await event.listen<string>('pty_ready', (event) => {
+                    if (isTerminalActive && event.payload === id) {
+                        console.log(`[TerminalComp] Received pty_ready for terminal ${id}`);
+                        setIsPtyReady(true);
+                        fitTerminal();
+                        writeToTerminal(id, 'clear\n').catch((err) => {
+                            console.error('Failed to write to PTY:', err);
+                            setError('Failed to send command to terminal');
+                        });
+                    }
+                });
+
+                const unsubscribePtyOutput = await event.listen<PtyOutput>('pty_output', (event) => {
+                    if (isTerminalActive && term.current && event.payload.id === id) {
+                        console.log(`[TerminalComp] Received pty_output for terminal ${id}:`, event.payload.data);
+                        term.current.write(event.payload.data);
+                    }
+                });
+
+                const resizeObserver = new ResizeObserver(() => {
+                    if (isTerminalActive && isPtyReady) {
+                        fitTerminal();
+                    }
+                });
+                resizeObserver.observe(terminalRef.current);
+
+                const handleResize = () => {
+                    if (isTerminalActive && isPtyReady) {
+                        fitTerminal();
+                    }
+                };
+                window.addEventListener('resize', handleResize);
+
+                return () => {
+                    isTerminalActive = false;
+                    isInitialized.current = false;
+                    unsubscribePtyReady();
+                    unsubscribePtyOutput();
+                    if (term.current?.element) {
+                        term.current.element.removeEventListener('focus', handleFocus);
+                        term.current.element.removeEventListener('blur', handleBlur);
+                    }
+                    term.current?.dispose();
+                    terminalRef.current?.removeEventListener('keydown', preventBubbling, true);
+                    terminalRef.current?.removeEventListener('keyup', preventBubbling, true);
+                    resizeObserver.disconnect();
+                    window.removeEventListener('resize', handleResize);
+
+                    closeTerminal(id)
+                        .catch((err) => {
+                            if (!err.toString().includes('No PTY session found')) {
+                                console.error('Failed to close PTY:', err);
+                            }
+                        })
+                        .finally(() => {
+                            onClose?.();
+                        });
+                };
+            } catch (err) {
+                console.error('Failed to initialize terminal:', err);
+                setError('Failed to initialize terminal');
+                isInitialized.current = false;
             }
         };
 
-        // Initial fit
-        handleResize();
-
-        // Add resize listeners
-        window.addEventListener('resize', handleResize);
-        const resizeObserver = new ResizeObserver(handleResize);
-        if (terminalRef.current) {
-            resizeObserver.observe(terminalRef.current);
-        }
-
-        return () => {
-            window.removeEventListener('resize', handleResize);
-            resizeObserver.disconnect();
-        };
-    }, []);
+        initializeTerminal();
+    }, [id, startTerminal, writeToTerminal, closeTerminal, setContext, onClose]);
 
     return (
-        <div className="terminal-container relative flex h-full w-full flex-col bg-[#1e1e1e]">
+        <div className="flex h-full flex-col overflow-hidden">
             {error && (
-                <div className="absolute top-0 left-0 right-0 z-50 bg-red-500 p-2 text-center text-white">
+                <div className="absolute top-0 left-0 right-0 z-50 bg-destructive p-2 text-center text-destructive-foreground">
                     {error}
                     <button
-                        className="ml-2 underline"
+                        className="ml-2 underline hover:opacity-80"
                         onClick={() => setError(null)}
                     >
                         Dismiss
@@ -120,8 +192,8 @@ function TerminalComp() {
             )}
             <div
                 ref={terminalRef}
-                className="flex-1 overflow-hidden"
-                style={{ padding: '4px' }}
+                className="flex-1 min-h-[300px] rounded-md border border-border/40 bg-background"
+                data-terminal-focused={isFocused}
             />
         </div>
     );
