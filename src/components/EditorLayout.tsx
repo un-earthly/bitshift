@@ -4,12 +4,14 @@ import { useEditorStore } from '@/store/editorStore';
 import EditorView from './EditorView';
 import { Button } from './ui/button';
 import {
-    X,
     Maximize2,
     SplitSquareHorizontal,
     SplitSquareVertical,
     Terminal as TerminalIcon,
-    Plus
+    Plus,
+    Trash2,
+    ChevronDown,
+    X
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import TerminalComponent from './Terminal';
@@ -326,16 +328,27 @@ export const EditorLayout: React.FC = () => {
                                     >
                                         <SplitSquareVertical className="h-4 w-4" />
                                     </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6 text-destructive hover:text-destructive"
+                                        onClick={() => terminals.forEach(t => handleTerminalClose(t.id))}
+                                        title="Kill All Terminals"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
                                 </div>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-6 w-6"
-                                    onClick={() => setIsTerminalVisible(false)}
-                                    title="Close Terminal Panel"
-                                >
-                                    <X className="h-4 w-4" />
-                                </Button>
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6"
+                                        onClick={() => setIsTerminalVisible(false)}
+                                        title="Hide Terminal Panel"
+                                    >
+                                        <ChevronDown className="h-4 w-4" />
+                                    </Button>
+                                </div>
                             </div>
 
                             {/* Terminal Content */}
@@ -367,7 +380,9 @@ export const EditorLayout: React.FC = () => {
                                                                 <TerminalComponent
                                                                     key={terminalId}
                                                                     id={terminalId}
-                                                                    onClose={() => handleTerminalClose(terminalId)}
+                                                                    onClose={() => setIsTerminalVisible(false)}
+                                                                    onDelete={() => handleTerminalClose(terminalId)}
+                                                                    isFocusedTerminal={terminals.length === 1}
                                                                 />
                                                             </Panel>
                                                         </React.Fragment>

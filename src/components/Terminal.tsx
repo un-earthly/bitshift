@@ -5,6 +5,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import { event } from '@tauri-apps/api';
 import { useContextKeys } from '@/commands/contextKeys';
 import { useTerminal } from '@/hooks/useTerminal';
+import { X } from 'lucide-react';
 import 'xterm/css/xterm.css';
 
 interface PtyOutput {
@@ -15,9 +16,11 @@ interface PtyOutput {
 interface TerminalProps {
     id: string;
     onClose: () => void;
+    onDelete: () => void;
+    isFocusedTerminal?: boolean;
 }
 
-function TerminalComp({ id, onClose }: TerminalProps) {
+function TerminalComp({ id, onClose, onDelete, isFocusedTerminal = false }: TerminalProps) {
     const [error, setError] = useState<string | null>(null);
     const [isFocused, setIsFocused] = useState(false);
     const [isPtyReady, setIsPtyReady] = useState(false);
@@ -177,8 +180,14 @@ function TerminalComp({ id, onClose }: TerminalProps) {
         initializeTerminal();
     }, [id, startTerminal, writeToTerminal, closeTerminal, setContext, onClose]);
 
+    useEffect(() => {
+        if (isFocusedTerminal && term.current?.element) {
+            term.current.focus();
+        }
+    }, [isFocusedTerminal]);
+
     return (
-        <div className="flex h-full flex-col overflow-hidden">
+        <div className="flex h-full flex-col overflow-hidden relative group">
             {error && (
                 <div className="absolute top-0 left-0 right-0 z-50 bg-destructive p-2 text-center text-destructive-foreground">
                     {error}
@@ -190,6 +199,16 @@ function TerminalComp({ id, onClose }: TerminalProps) {
                     </button>
                 </div>
             )}
+            {/* Terminal Controls (visible on hover) */}
+            <div className="absolute top-0 right-0 p-1 opacity-0 group-hover:opacity-100 transition-opacity bg-background/80 rounded-bl border-l border-b border-border/40 z-10">
+                <button
+                    className="p-1 hover:bg-border/40 rounded"
+                    onClick={onDelete}
+                    title="Delete Terminal"
+                >
+                    <X className="h-3 w-3" />
+                </button>
+            </div>
             <div
                 ref={terminalRef}
                 className="flex-1 min-h-[300px] rounded-md border border-border/40 bg-background"
