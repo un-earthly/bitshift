@@ -18,11 +18,13 @@ import { useKeybindings } from './hooks/useKeybindings';
 import { useCommandRegistry } from './commands/registry';
 import { useContextKeys } from './commands/contextKeys';
 import { Toaster } from 'sonner';
+import { ProjectInitDialog } from './components/ProjectInitDialog';
 import './App.css';
 
 const App: React.FC = () => {
   const [isChatVisible, setIsChatVisible] = useState(true);
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
+  const [showInitDialog, setShowInitDialog] = useState(true);
   const { theme, setTheme } = useTheme();
   const {
     tree,
@@ -140,6 +142,10 @@ const App: React.FC = () => {
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-background">
       <Toaster richColors position="top-right" />
+      <ProjectInitDialog
+        open={showInitDialog}
+        onOpenChange={setShowInitDialog}
+      />
 
       {/* Top Bar */}
       <div className="absolute top-0 z-10 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
