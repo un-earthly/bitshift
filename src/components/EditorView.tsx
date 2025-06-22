@@ -1,13 +1,14 @@
-import React, { useRef } from 'react';
+import React, { useEffect } from 'react';
 import Editor from '@monaco-editor/react';
 import { cn } from '@/lib/utils';
 import { getLanguage } from '@/lib/languages';
 import * as monaco from 'monaco-editor';
+import { useChatExtensionsStore } from '../store/chatExtensionsStore';
 
 interface EditorViewProps {
   filePath: string;
   content: string;
-  onChange: (value: string) => void;
+  onChange: (content: string) => void;
   className?: string;
 }
 
@@ -17,19 +18,43 @@ const EditorView: React.FC<EditorViewProps> = ({
   onChange,
   className,
 }) => {
-  const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
+  const {
+    setCursorPosition,
+    setSelectedText,
+    setActiveFile,
+  } = useChatExtensionsStore();
+
+  useEffect(() => {
+    setActiveFile(filePath);
+    return () => setActiveFile(null);
+  }, [filePath, setActiveFile]);
 
   const handleEditorDidMount = (editor: monaco.editor.IStandaloneCodeEditor) => {
-    editorRef.current = editor;
-  };
+    // Track cursor position
+    editor.onDidChangeCursorPosition((e: monaco.editor.ICursorPositionChangedEvent) => {
+      const position = e.position;
+      setCursorPosition({
+        line: position.lineNumber,
+        column: position.column,
+      });
+    });
 
+    // Track text selection
+    editor.onDidChangeCursorSelection((e: monaco.editor.ICursorSelectionChangedEvent) => {
+      const model = editor.getModel();
+      if (model) {
+        const selection = model.getValueInRange(e.selection);
+        setSelectedText(selection || null);
+      }
+    });
+  };
 
   return (
     <div className={cn('h-full w-full', className)}>
       <Editor
         height="100%"
         defaultLanguage={getLanguage(filePath)}
-        defaultValue={content}
+        value={content}
         onChange={(value) => onChange(value || '')}
         onMount={handleEditorDidMount}
         theme="vs-dark"

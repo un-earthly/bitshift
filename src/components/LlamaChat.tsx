@@ -3,6 +3,7 @@ import { cn } from '../lib/utils';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
 import { useChatState } from '../hooks/useChatState';
+import { useChatExtensionsStore } from '../store/chatExtensionsStore';
 import ReactMarkdown from 'react-markdown';
 import {
   Select,
@@ -49,6 +50,19 @@ export const LlamaChat: React.FC<LlamaChatProps> = ({
     getSessions,
   } = useChatState();
 
+  const {
+    cursorPosition,
+    selectedText,
+    activeFile,
+    lastTerminalId,
+    isTerminalBusy,
+    runTerminalCommand,
+    createFile,
+    updateFile,
+    deleteFile,
+    readFile,
+  } = useChatExtensionsStore();
+
   const [sessions, setSessions] = React.useState<Array<{ id: string; title: string }>>([]);
   const [error, setError] = React.useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -91,7 +105,7 @@ export const LlamaChat: React.FC<LlamaChatProps> = ({
     return null;
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const validationError = validateInput(userInput);
 
@@ -102,6 +116,27 @@ export const LlamaChat: React.FC<LlamaChatProps> = ({
 
     if (!isGenerating) {
       setError(null);
+
+      // Add file context if available
+      let messageWithContext = userInput;
+      if (activeFile) {
+        try {
+          const fileContent = await readFile(activeFile);
+          messageWithContext = `[File Context: ${activeFile}]\n\`\`\`\n${fileContent}\n\`\`\`\n\n${userInput}`;
+        } catch (error) {
+          console.error('Failed to read file context:', error);
+        }
+      }
+
+      // Add cursor/selection context if available
+      if (cursorPosition) {
+        messageWithContext = `[Cursor Position: Line ${cursorPosition.line}, Column ${cursorPosition.column}]\n${messageWithContext}`;
+      }
+      if (selectedText) {
+        messageWithContext = `[Selected Text: ${selectedText}]\n${messageWithContext}`;
+      }
+
+      setUserInput(messageWithContext);
       handleSendMessage();
     }
   };
@@ -227,6 +262,45 @@ export const LlamaChat: React.FC<LlamaChatProps> = ({
                         {message.content || '*Empty message*'}
                       </ReactMarkdown>
                     </div>
+                    {message.role === 'assistant' && message.content.includes('```') && (
+                      <div className="mt-2 flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            // Extract and run code blocks
+                            const codeBlocks = message.content.match(/```(?:\w+)?\n([\s\S]*?)```/g);
+                            if (codeBlocks) {
+                              codeBlocks.forEach(block => {
+                                const code = block.replace(/```(?:\w+)?\n([\s\S]*?)```/, '$1').trim();
+                                if (code.startsWith('$')) {
+                                  // Run as terminal command
+                                  runTerminalCommand(code.slice(1).trim());
+                                }
+                              });
+                            }
+                          }}
+                        >
+                          Run Code
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            // Extract and save code blocks to file
+                            const codeBlocks = message.content.match(/```(?:\w+)?\n([\s\S]*?)```/g);
+                            if (codeBlocks && activeFile) {
+                              const code = codeBlocks.map(block =>
+                                block.replace(/```(?:\w+)?\n([\s\S]*?)```/, '$1').trim()
+                              ).join('\n\n');
+                              updateFile(activeFile, code);
+                            }
+                          }}
+                        >
+                          Save to File
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
