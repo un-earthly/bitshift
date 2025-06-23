@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-
+import { open } from '@tauri-apps/plugin-dialog';
 export interface EditorTab {
     id: string;
     filePath: string;
@@ -30,6 +30,12 @@ interface EditorStore {
     closeAllPanes: () => void;
     splitPane: (paneId: string, direction: 'horizontal' | 'vertical') => void;
     updateContent: (paneId: string, tabId: string, content: string) => void;
+    // Theme and chat toggle
+    theme: string;
+    setTheme: (theme: string) => void;
+    isChatVisible: boolean;
+    setIsChatVisible: (visible: boolean) => void;
+
 }
 
 export const useEditorStore = create<EditorStore>((set) => ({
@@ -87,7 +93,6 @@ export const useEditorStore = create<EditorStore>((set) => ({
             }
         };
     }),
-
     setActiveTab: (paneId, tabId) => set(state => ({
         layout: {
             ...state.layout,
@@ -243,5 +248,10 @@ export const useEditorStore = create<EditorStore>((set) => ({
                     : pane
             )
         }
-    }))
+    })),
+
+    theme: 'light',
+    setTheme: (theme) => set(() => ({ theme })),
+    isChatVisible: true,
+    setIsChatVisible: (visible) => set(() => ({ isChatVisible: visible })),
 }));

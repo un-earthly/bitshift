@@ -8,10 +8,6 @@ import { ChatSidebar } from './components/ChatSidebar';
 import { useFileSystem } from './hooks/useFileSystem';
 import { open } from '@tauri-apps/plugin-dialog';
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { Button } from './components/ui/button';
-import { useTheme } from './components/theme-provider';
-import { FolderOpen, Moon, Sun, MessageSquare } from 'lucide-react';
-import { Separator } from './components/ui/separator';
 import { EditorLayout } from './components/EditorLayout';
 import { FileTreeContainer } from './components/FileTreeContainer';
 import { useKeybindings } from './hooks/useKeybindings';
@@ -20,12 +16,11 @@ import { useContextKeys } from './commands/contextKeys';
 import { Toaster } from 'sonner';
 import { ProjectInitDialog } from './components/ProjectInitDialog';
 import './App.css';
+import { useEditorStore } from './store/editorStore';
 
 const App: React.FC = () => {
-  const [isChatVisible, setIsChatVisible] = useState(true);
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
   const [showInitDialog, setShowInitDialog] = useState(true);
-  const { theme, setTheme } = useTheme();
   const {
     tree,
     loadFolder,
@@ -37,7 +32,7 @@ const App: React.FC = () => {
     saveFileAs,
     closeCurrentFile,
   } = useFileSystem();
-
+  const { isChatVisible, setIsChatVisible } = useEditorStore()
   const registerCommand = useCommandRegistry(state => state.registerCommand);
   const unregisterCommand = useCommandRegistry(state => state.unregisterCommand);
   const setContext = useContextKeys(state => state.setContext);
@@ -53,26 +48,14 @@ const App: React.FC = () => {
     setContext('terminalFocus', false);
     setContext('chatFocus', false);
     setContext('sidebarVisible', isSidebarVisible);
-    setContext('chatVisible', isChatVisible);
-  }, [setContext, isSidebarVisible, isChatVisible]);
+    // setContext('chatVisible', isChatVisible);
+  }, [setContext, isSidebarVisible]);
 
-  const handleOpenFolder = async () => {
-    try {
-      const selected = await open({
-        directory: true,
-        multiple: false,
-      });
-      if (selected && typeof selected === 'string') {
-        await loadFolder(selected);
-      }
-    } catch (err) {
-      console.error('Failed to open folder:', err);
-    }
-  };
+
 
   useEffect(() => {
     // Register file-related commands
-    registerCommand('workbench.action.files.openFile', handleOpenFolder);
+    // registerCommand('workbench.action.files.openFile', handleOpenFolder);
     registerCommand('workbench.action.files.newFolder', async () => {
       if (!workspacePath) return;
       const folderName = 'new-folder';
@@ -106,7 +89,7 @@ const App: React.FC = () => {
       unregisterCommand('workbench.action.toggleChat');
     };
   }, [registerCommand, unregisterCommand, workspacePath, createNewFile, createNewFolder,
-    saveCurrentFile, saveFileAs, closeCurrentFile, isSidebarVisible, isChatVisible, handleOpenFolder, setContext]);
+    saveCurrentFile, saveFileAs, closeCurrentFile, isSidebarVisible, isChatVisible, setContext]);
 
   useEffect(() => {
     const checkDetachedWindow = async () => {
@@ -148,7 +131,7 @@ const App: React.FC = () => {
       />
 
       {/* Top Bar */}
-      <div className="absolute top-0 z-10 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      {/* <div className="absolute top-0 z-10 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="flex h-14 items-center gap-4 px-4">
           <Button onClick={handleOpenFolder} variant="outline" size="sm" className="gap-2">
             <FolderOpen className="h-4 w-4" />
@@ -174,55 +157,48 @@ const App: React.FC = () => {
             </Button>
           </div>
         </div>
-      </div>
+      </div> */}
 
       {/* Main Content */}
-      <div className="pt-14">
-        <PanelGroup direction="horizontal" autoSaveId="app-layout">
-          {/* File Tree */}
-          {isSidebarVisible && (
-            <>
-              <Panel id="filetree" defaultSize={15} minSize={10} maxSize={30}>
-                <div className="h-full border-r border-border/40">
-                  <FileTreeContainer
-                    nodes={tree}
-                    onFolderClick={toggleFolder}
-                    workspacePath={workspacePath || ''}
-                  />
-                </div>
-              </Panel>
-              <PanelResizeHandle className="w-1.5 bg-border/40 hover:bg-border/60 transition-colors" />
-            </>
-          )}
+      <PanelGroup direction="horizontal" autoSaveId="app-layout">
+        {isSidebarVisible && (
+          <>
+            <Panel id="filetree" defaultSize={15} minSize={10} maxSize={30}>
+              <div className="h-full border-r border-border/40">
+                <FileTreeContainer />
+              </div>
+            </Panel>
+            <PanelResizeHandle className="w-1.5 bg-border/40 hover:bg-border/60 transition-colors" />
+          </>
+        )}
 
-          {/* Editor */}
-          <Panel
-            id="editor"
-            defaultSize={isSidebarVisible ? (isChatVisible ? 65 : 85) : (isChatVisible ? 80 : 100)}
-            minSize={40}
-          >
-            <EditorLayout />
-          </Panel>
+        {/* Editor */}
+        <Panel
+          id="editor"
+          defaultSize={isSidebarVisible ? (isChatVisible ? 65 : 85) : (isChatVisible ? 80 : 100)}
+          minSize={40}
+        >
+          <EditorLayout />
+        </Panel>
 
-          {/* Chat */}
-          {isChatVisible && (
-            <>
-              <PanelResizeHandle className="w-1.5 bg-border/40 hover:bg-border/60 transition-colors" />
-              <Panel
-                id="chat"
-                defaultSize={20}
-                minSize={15}
-                maxSize={40}
-                order={2}
-              >
-                <div className="h-full border-l border-border/40">
-                  <ChatSidebar onDetach={handleDetach} />
-                </div>
-              </Panel>
-            </>
-          )}
-        </PanelGroup>
-      </div>
+        {/* Chat */}
+        {isChatVisible && (
+          <>
+            <PanelResizeHandle className="w-1.5 bg-border/40 hover:bg-border/60 transition-colors" />
+            <Panel
+              id="chat"
+              defaultSize={20}
+              minSize={15}
+              maxSize={40}
+              order={2}
+            >
+              <div className="h-full border-l border-border/40">
+                <ChatSidebar onDetach={handleDetach} />
+              </div>
+            </Panel>
+          </>
+        )}
+      </PanelGroup>
     </div>
   );
 };

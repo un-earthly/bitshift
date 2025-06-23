@@ -6,37 +6,28 @@ import FileTree from './FileTree';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
-import { ScrollArea } from './ui/scroll-area';
 import {
-    RefreshCw,
     FileIcon,
     FolderIcon,
-    ChevronDown,
-    Plus,
+    FolderPlusIcon,
+    FilePlusIcon,
+    RotateCw,
+    CopyMinus,
 } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
-import { cn } from '@/lib/utils';
 import { handleKeyboardShortcut, ShortcutHandlers } from '@/lib/keyboard-shortcuts';
 import { toast } from 'sonner';
+import { open } from '@tauri-apps/plugin-dialog';
 
-interface FileTreeContainerProps {
-    nodes: any;
-    workspacePath: string;
-    onFolderClick: (path: string) => Promise<void>;
-}
 
 interface FileOpResult {
     success: boolean;
     message: string;
 }
 
-export const FileTreeContainer: React.FC<FileTreeContainerProps> = ({
-    nodes,
-    workspacePath,
-    onFolderClick
-}) => {
+export const FileTreeContainer: React.FC = () => {
     const { openFile } = useEditorStore();
-    const { refreshFolder } = useFileSystem();
+    const { refreshFolder, loadFolder, workspacePath, tree: nodes } = useFileSystem();
     const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
     const [showNewFileDialog, setShowNewFileDialog] = useState(false);
     const [showNewFolderDialog, setShowNewFolderDialog] = useState(false);
@@ -69,9 +60,21 @@ export const FileTreeContainer: React.FC<FileTreeContainerProps> = ({
 
     const handleFolderClick = async (path: string) => {
         setSelectedFolder(path);
-        await onFolderClick(path);
+        // await onFolderClick(path);
     };
-
+    const handleOpenFolder = async () => {
+        try {
+            const selected = await open({
+                directory: true,
+                multiple: false,
+            });
+            if (selected && typeof selected === 'string') {
+                await loadFolder(selected);
+            }
+        } catch (err) {
+            console.error('Failed to open folder:', err);
+        }
+    };
     const handleIndexWorkspace = async () => {
         if (!workspacePath) {
             console.error("Workspace path is not available.");
@@ -97,10 +100,10 @@ export const FileTreeContainer: React.FC<FileTreeContainerProps> = ({
     const handleCreateFile = async () => {
         if (!newItemName) return;
         const parentDir = selectedFolder || workspacePath;
-        const filePath = parentDir.endsWith('/') ? parentDir + newItemName : parentDir + '/' + newItemName;
+        const filePath = parentDir?.endsWith('/') ? parentDir + newItemName : parentDir + '/' + newItemName;
         try {
             await writeTextFile(filePath, '');
-            await refreshFolder(parentDir);
+            await refreshFolder(parentDir as string);
             setShowNewFileDialog(false);
             setNewItemName('');
             // Open the newly created file
@@ -111,15 +114,14 @@ export const FileTreeContainer: React.FC<FileTreeContainerProps> = ({
             toast.error('Failed to create file');
         }
     };
-
     const handleCreateFolder = async () => {
         if (!newItemName) return;
         const parentDir = selectedFolder || workspacePath;
-        const folderPath = parentDir.endsWith('/') ? parentDir + newItemName : parentDir + '/' + newItemName;
+        const folderPath = parentDir?.endsWith('/') ? parentDir + newItemName : parentDir + '/' + newItemName;
         try {
             const result = await invoke<FileOpResult>('create_dir', { path: folderPath });
             if (result.success) {
-                await refreshFolder(parentDir);
+                await refreshFolder(parentDir as string);
                 setShowNewFolderDialog(false);
                 setNewItemName('');
                 toast.success(result.message);
@@ -184,7 +186,10 @@ export const FileTreeContainer: React.FC<FileTreeContainerProps> = ({
         <div className="relative flex flex-col h-full bg-background">
 
             <div className="flex-none flex items-center justify-between p-2 border-b">
-                <div className="flex items-center gap-1">
+                <p className='text-xs uppercase'>
+                    Explorer: {workspacePath?.split("/")[workspacePath?.split("/").length - 1] || ' No folder Opened'}
+                </p>
+                {/* <div className="flex items-center gap-1">
                     <Button
                         variant="ghost"
                         size="sm"
@@ -201,101 +206,43 @@ export const FileTreeContainer: React.FC<FileTreeContainerProps> = ({
                         onClick={() => setShowNewFolderDialog(true)}
                     >
                         <Plus className="h-3.5 w-3.5" />
-                        <FolderIcon className="h-3.5 w-3.5" />
-                    </Button>
+                        </Button>
+                        </div> */}
+                <div className='flex items-center gap-2'>
+                    <FilePlusIcon size={18} />
+                    <FolderPlusIcon size={18} />
+                    <RotateCw size={18} />
+                    <CopyMinus size={18} />
                 </div>
             </div>
 
-            <div className="p-2 h-[calc(100vh-100px)] overflow-auto">
-                <FileTree
-                    nodes={nodes}
-                    onFileClick={handleFileClick}
-                    onFolderClick={handleFolderClick}
-                    onRename={handleRename}
-                    onDelete={handleDelete}
-                    onMove={handleMove}
-                />
+            <div className="p-2 h-screen overflow-auto">
+                {!workspacePath ? (
+                    <div className="flex flex-col items-center justify-center h-full">
+                        <Button
+                            variant="outline"
+                            className="px-4 py-2 rounded bg-accent text-accent-foreground hover:bg-accent/80 transition-colors"
+                            onClick={handleOpenFolder}
+                        >
+                            Open a Folder
+                        </Button>
+                        <p className="text-sm text-muted-foreground mt-4">
+                            Lets gets started with bitshift.
+                        </p>
+                    </div>
+                ) : (
+                    <FileTree
+                        nodes={nodes}
+                        onFileClick={handleFileClick}
+                        onFolderClick={handleFolderClick}
+                        onRename={handleRename}
+                        onDelete={handleDelete}
+                        onMove={handleMove}
+                    />
+                )}
             </div>
 
-            {/* New File Dialog */}
-            <Dialog open={showNewFileDialog} onOpenChange={setShowNewFileDialog}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                            <FileIcon className="h-5 w-5" />
-                            New File
-                        </DialogTitle>
-                    </DialogHeader>
-                    <div className="py-4">
-                        <Input
-                            value={newItemName}
-                            onChange={(e) => setNewItemName(e.target.value)}
-                            placeholder="Enter file name..."
-                            className="col-span-3"
-                            autoFocus
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                    handleCreateFile();
-                                }
-                            }}
-                        />
-                        <p className="text-sm text-muted-foreground mt-2">
-                            Parent folder: {selectedFolder || workspacePath}
-                        </p>
-                    </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => {
-                            setShowNewFileDialog(false);
-                            setNewItemName('');
-                        }}>
-                            Cancel
-                        </Button>
-                        <Button onClick={handleCreateFile}>
-                            Create
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
 
-            {/* New Folder Dialog */}
-            <Dialog open={showNewFolderDialog} onOpenChange={setShowNewFolderDialog}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                            <FolderIcon className="h-5 w-5" />
-                            New Folder
-                        </DialogTitle>
-                    </DialogHeader>
-                    <div className="py-4">
-                        <Input
-                            value={newItemName}
-                            onChange={(e) => setNewItemName(e.target.value)}
-                            placeholder="Enter folder name..."
-                            className="col-span-3"
-                            autoFocus
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                    handleCreateFolder();
-                                }
-                            }}
-                        />
-                        <p className="text-sm text-muted-foreground mt-2">
-                            Parent folder: {selectedFolder || workspacePath}
-                        </p>
-                    </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => {
-                            setShowNewFolderDialog(false);
-                            setNewItemName('');
-                        }}>
-                            Cancel
-                        </Button>
-                        <Button onClick={handleCreateFolder}>
-                            Create
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
         </div>
     );
 };

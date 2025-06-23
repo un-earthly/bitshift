@@ -12,6 +12,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
+import { HistoryIcon, Plus, XIcon } from 'lucide-react';
+import { useEditorStore } from '@/store/editorStore';
 
 const ProgressBar = ({ progress }: { progress: number }) => (
   <div className="h-1 w-full overflow-hidden rounded-full bg-muted">
@@ -62,7 +64,7 @@ export const LlamaChat: React.FC<LlamaChatProps> = ({
     deleteFile,
     readFile,
   } = useChatExtensionsStore();
-
+  const { setIsChatVisible } = useEditorStore();
   const [sessions, setSessions] = React.useState<Array<{ id: string; title: string }>>([]);
   const [error, setError] = React.useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -160,32 +162,30 @@ export const LlamaChat: React.FC<LlamaChatProps> = ({
         <div className="flex-none border-b border-border/40 bg-muted/40 p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <h2 className="text-lg font-semibold">Chat</h2>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  createNewSession();
-                  loadSessions();
-                }}
-              >
-                New Chat
-              </Button>
+              <h2 className="text-xs font-semibold">Chat</h2>
+
             </div>
-            <Select
-              onValueChange={(sessionId) => loadChatHistory(sessionId)}
-            >
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Load chat history" />
-              </SelectTrigger>
-              <SelectContent className="bg-gray-950" >
-                {sessions.map((session) => (
-                  <SelectItem key={session.id} value={session.id}>
-                    {session.title || `Chat ${session.id.slice(0, 8)}...`}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className='flex items-center gap-0'>
+              <Plus className='text-xs' size={18} onClick={() => {
+                createNewSession();
+                loadSessions();
+              }} />
+              <Select
+                onValueChange={(sessionId) => loadChatHistory(sessionId)}
+              >
+                <SelectTrigger size='sm' isArrow={false} className="w-[30px] p-1.5 border-none">
+                  <SelectValue placeholder={<HistoryIcon />} />
+                </SelectTrigger>
+                <SelectContent className="bg-gray-950" >
+                  {sessions.map((session) => (
+                    <SelectItem key={session.id} value={session.id}>
+                      {session.title || `Chat ${session.id.slice(0, 8)}...`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <XIcon size={18} onClick={() => setIsChatVisible(false)} />
+            </div>
           </div>
 
           <div className="mt-4 space-y-4">
@@ -359,12 +359,43 @@ export const LlamaChat: React.FC<LlamaChatProps> = ({
             </p>
           )}
           <div className="flex justify-between text-xs text-muted-foreground">
-            <span>
+            {/* <span>
               {selectedModel ? `Using ${selectedModel.name}` : 'No model selected'}
             </span>
             <span>
               {userInput.length}/{maxMessageLength}
-            </span>
+            </span> */}
+
+            <Select
+              value={activeFile || ""}
+              onValueChange={(file) => {
+                if (file) {
+                  readFile(file).then(content => {
+                    setUserInput(content);
+                  }).catch(err => {
+                    console.error('Failed to load file:', err);
+                  });
+                } else {
+                  setUserInput('');
+                }
+              }}
+              disabled={isGenerating || isDownloading}
+            >
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Select a file" />
+              </SelectTrigger>
+              <SelectContent className="bg-gray-950">
+                {/* {useChatExtensionsStore.getState().files.map((file) => (
+                  <SelectItem key={file.id} value={file.id}>
+                    {file.name}
+                  </SelectItem>
+                ))} */}
+                {/* <SelectItem value="" disabled={!useChatExtensionsStore.getState().files.length}> */}
+                {/* No files available
+                </SelectItem> */}
+              </SelectContent>
+
+            </Select>
           </div>
         </div>
       </form>
