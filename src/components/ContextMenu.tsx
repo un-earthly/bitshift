@@ -17,11 +17,11 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { 
-    Copy, 
-    Trash, 
-    Pencil, 
-    FileIcon, 
+import {
+    Copy,
+    Trash,
+    Pencil,
+    FileIcon,
     FolderIcon,
     FilePlus,
     FolderPlus,
@@ -37,6 +37,8 @@ interface FileContextMenuProps {
     onCopyPath: () => void;
     isDirectory?: boolean;
     fileName: string;
+    onLoadDepth?: (depth: number) => void;
+    onLoadFull?: () => void;
 }
 
 export const FileContextMenu: React.FC<FileContextMenuProps> = ({
@@ -46,6 +48,8 @@ export const FileContextMenu: React.FC<FileContextMenuProps> = ({
     onCopyPath,
     isDirectory,
     fileName,
+    onLoadDepth,
+    onLoadFull,
 }) => {
     const [showRenameDialog, setShowRenameDialog] = useState(false);
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -78,6 +82,28 @@ export const FileContextMenu: React.FC<FileContextMenuProps> = ({
                                 <FolderPlus className="h-4 w-4" />
                                 <span>New Folder</span>
                                 <ContextMenuShortcut>⇧⌘N</ContextMenuShortcut>
+                            </ContextMenuItem>
+                            <ContextMenuSeparator />
+                            <ContextMenuItem
+                                className="gap-2 cursor-pointer"
+                                onClick={() => onLoadDepth?.(2)}
+                            >
+                                <RotateCw className="h-4 w-4" />
+                                <span>Load 2 Levels Deep</span>
+                            </ContextMenuItem>
+                            <ContextMenuItem
+                                className="gap-2 cursor-pointer"
+                                onClick={() => onLoadDepth?.(3)}
+                            >
+                                <RotateCw className="h-4 w-4" />
+                                <span>Load 3 Levels Deep</span>
+                            </ContextMenuItem>
+                            <ContextMenuItem
+                                className="gap-2 cursor-pointer"
+                                onClick={onLoadFull}
+                            >
+                                <RotateCw className="h-4 w-4" />
+                                <span>Load Full Structure</span>
                             </ContextMenuItem>
                             <ContextMenuSeparator />
                         </>

@@ -16,6 +16,8 @@ interface FileMetadata {
 // Extended interface for UI state
 interface FileNode extends FileMetadata {
   isExpanded?: boolean;
+  isLoading?: boolean; // Track loading state for better UX
+  hasLoadedChildren?: boolean; // Track if children have been loaded
 }
 
 export const useFileSystem = () => {
@@ -30,6 +32,8 @@ export const useFileSystem = () => {
       const convertToFileNode = (entry: FileMetadata): FileNode => ({
         ...entry,
         isExpanded: false,
+        isLoading: false,
+        hasLoadedChildren: depth > 1, // Mark as loaded if we fetched children
         children: entry.children?.map(convertToFileNode)
       });
       return entries.map(convertToFileNode);
@@ -39,19 +43,30 @@ export const useFileSystem = () => {
     }
   };
 
-  const loadFolder = async (rootPath: string) => {
-    const rootNodes = await readFolder(rootPath, 2);
+  // Load folder with initial depth of 1 for better performance
+  const loadFolder = async (rootPath: string, initialDepth: number = 1) => {
+    const rootNodes = await readFolder(rootPath, initialDepth);
     setTree(rootNodes);
     setWorkspacePath(rootPath);
     setActivePath(null);
     setOpenFiles([]);
   };
 
-  const refreshFolder = async (path: string) => {
+  // Load entire folder structure (useful for search or when user wants full view)
+  const loadFullFolder = async (rootPath: string) => {
+    const rootNodes = await readFolder(rootPath, 10); // Use high depth to get everything
+    setTree(rootNodes);
+    setWorkspacePath(rootPath);
+    setActivePath(null);
+    setOpenFiles([]);
+  };
+
+  // Load specific depth for a folder
+  const loadFolderDepth = async (path: string, depth: number) => {
     if (!workspacePath) return;
 
     if (path === workspacePath) {
-      const rootNodes = await readFolder(workspacePath, 2);
+      const rootNodes = await readFolder(workspacePath, depth);
       setTree(prevTree => {
         const transferExpandedStates = (newNodes: FileNode[], prevNodes: FileNode[]): FileNode[] => {
           return newNodes.map(newNode => {
@@ -59,6 +74,64 @@ export const useFileSystem = () => {
             return {
               ...newNode,
               isExpanded: prevNode?.isExpanded || false,
+              isLoading: false,
+              hasLoadedChildren: depth > 1,
+              children: newNode.children && prevNode?.children
+                ? transferExpandedStates(newNode.children, prevNode.children)
+                : newNode.children
+            };
+          });
+        };
+        return transferExpandedStates(rootNodes, prevTree);
+      });
+      return;
+    }
+
+    const updateNodeInTree = async (nodes: FileNode[], targetPath: string): Promise<FileNode[]> => {
+      const updatedNodes = await Promise.all(nodes.map(async node => {
+        if (node.path === targetPath) {
+          const freshChildren = await readFolder(node.path, depth);
+          return {
+            ...node,
+            children: freshChildren,
+            isExpanded: true,
+            isLoading: false,
+            hasLoadedChildren: depth > 1
+          };
+        }
+
+        if (node.children && node.children.length > 0) {
+          const updatedChildren = await updateNodeInTree(node.children, targetPath);
+          return {
+            ...node,
+            children: updatedChildren
+          };
+        }
+
+        return node;
+      }));
+
+      return updatedNodes;
+    };
+
+    const updatedTree = await updateNodeInTree([...tree], path);
+    setTree(updatedTree);
+  };
+
+  const refreshFolder = async (path: string) => {
+    if (!workspacePath) return;
+
+    if (path === workspacePath) {
+      const rootNodes = await readFolder(workspacePath, 1); // Keep initial depth
+      setTree(prevTree => {
+        const transferExpandedStates = (newNodes: FileNode[], prevNodes: FileNode[]): FileNode[] => {
+          return newNodes.map(newNode => {
+            const prevNode = prevNodes.find(p => p.path === newNode.path);
+            return {
+              ...newNode,
+              isExpanded: prevNode?.isExpanded || false,
+              isLoading: false,
+              hasLoadedChildren: prevNode?.hasLoadedChildren || false,
               children: newNode.children && prevNode?.children
                 ? transferExpandedStates(newNode.children, prevNode.children)
                 : newNode.children
@@ -77,7 +150,9 @@ export const useFileSystem = () => {
           return {
             ...node,
             children: freshChildren,
-            isExpanded: true
+            isExpanded: true,
+            isLoading: false,
+            hasLoadedChildren: true
           };
         }
 
@@ -106,8 +181,21 @@ export const useFileSystem = () => {
           if (node.isExpanded) {
             return { ...node, isExpanded: false };
           } else {
-            const children = await readFolder(node.path);
-            return { ...node, isExpanded: true, children };
+            // Set loading state
+            const loadingNode = { ...node, isExpanded: true, isLoading: true };
+
+            // Load children if not already loaded
+            let children = node.children;
+            if (!node.hasLoadedChildren) {
+              children = await readFolder(node.path);
+            }
+
+            return {
+              ...loadingNode,
+              children,
+              isLoading: false,
+              hasLoadedChildren: true
+            };
           }
         } else if (node.children) {
           return {
@@ -223,6 +311,8 @@ export const useFileSystem = () => {
     openFiles,
     activeFile: openFiles.find(f => f.path === activePath) || null,
     loadFolder,
+    loadFullFolder,
+    loadFolderDepth,
     refreshFolder,
     openFile,
     closeFile,

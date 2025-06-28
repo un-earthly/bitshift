@@ -4,11 +4,7 @@ import { useEditorStore } from '@/store/editorStore';
 import { useFileSystem } from '@/hooks/useFileSystem';
 import FileTree from './FileTree';
 import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
 import {
-    FileIcon,
-    FolderIcon,
     FolderPlusIcon,
     FilePlusIcon,
     RotateCw,
@@ -27,12 +23,23 @@ interface FileOpResult {
 
 export const FileTreeContainer: React.FC = () => {
     const { openFile } = useEditorStore();
-    const { refreshFolder, loadFolder, workspacePath, tree: nodes } = useFileSystem();
+    const {
+        refreshFolder,
+        loadFolder,
+        loadFullFolder,
+        loadFolderDepth,
+        toggleFolder,
+        workspacePath,
+        tree: nodes
+    } = useFileSystem();
     const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
     const [showNewFileDialog, setShowNewFileDialog] = useState(false);
     const [showNewFolderDialog, setShowNewFolderDialog] = useState(false);
     const [newItemName, setNewItemName] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [newFileInputActive, setNewFileInputActive] = useState(false);
+    const [newFolderInputActive, setNewFolderInputActive] = useState(false);
+    const [newItemInputValue, setNewItemInputValue] = useState("");
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -60,8 +67,9 @@ export const FileTreeContainer: React.FC = () => {
 
     const handleFolderClick = async (path: string) => {
         setSelectedFolder(path);
-        // await onFolderClick(path);
+        await toggleFolder(path);
     };
+
     const handleOpenFolder = async () => {
         try {
             const selected = await open({
@@ -69,12 +77,55 @@ export const FileTreeContainer: React.FC = () => {
                 multiple: false,
             });
             if (selected && typeof selected === 'string') {
-                await loadFolder(selected);
+                await loadFolder(selected, 1); // Load with initial depth of 1
             }
         } catch (err) {
             console.error('Failed to open folder:', err);
         }
     };
+
+    const handleLoadFullFolder = async () => {
+        if (!workspacePath) return;
+        try {
+            await loadFullFolder(workspacePath);
+            toast.success('Full folder structure loaded');
+        } catch (err) {
+            console.error('Failed to load full folder:', err);
+            toast.error('Failed to load full folder structure');
+        }
+    };
+
+    const handleLoadFolderDepth = async (depth: number) => {
+        if (!workspacePath) return;
+        try {
+            await loadFolderDepth(workspacePath, depth);
+            toast.success(`Loaded folder structure with depth ${depth}`);
+        } catch (err) {
+            console.error('Failed to load folder depth:', err);
+            toast.error('Failed to load folder structure');
+        }
+    };
+
+    const handleLoadFolderDepthForPath = async (path: string, depth: number) => {
+        try {
+            await loadFolderDepth(path, depth);
+            toast.success(`Loaded folder structure with depth ${depth}`);
+        } catch (err) {
+            console.error('Failed to load folder depth:', err);
+            toast.error('Failed to load folder structure');
+        }
+    };
+
+    const handleLoadFullFolderForPath = async (path: string) => {
+        try {
+            await loadFullFolder(path);
+            toast.success('Full folder structure loaded');
+        } catch (err) {
+            console.error('Failed to load full folder:', err);
+            toast.error('Failed to load full folder structure');
+        }
+    };
+
     const handleIndexWorkspace = async () => {
         if (!workspacePath) {
             console.error("Workspace path is not available.");
@@ -97,16 +148,16 @@ export const FileTreeContainer: React.FC = () => {
         }
     };
 
-    const handleCreateFile = async () => {
-        if (!newItemName) return;
+    const handleCreateFile = async (name?: string) => {
+        const fileName = name || newItemName;
+        if (!fileName) return;
         const parentDir = selectedFolder || workspacePath;
-        const filePath = parentDir?.endsWith('/') ? parentDir + newItemName : parentDir + '/' + newItemName;
+        const filePath = parentDir?.endsWith('/') ? parentDir + fileName : parentDir + '/' + fileName;
         try {
             await writeTextFile(filePath, '');
             await refreshFolder(parentDir as string);
             setShowNewFileDialog(false);
             setNewItemName('');
-            // Open the newly created file
             openFile(filePath, '');
             toast.success('File created successfully');
         } catch (err) {
@@ -114,10 +165,11 @@ export const FileTreeContainer: React.FC = () => {
             toast.error('Failed to create file');
         }
     };
-    const handleCreateFolder = async () => {
-        if (!newItemName) return;
+    const handleCreateFolder = async (name?: string) => {
+        const folderName = name || newItemName;
+        if (!folderName) return;
         const parentDir = selectedFolder || workspacePath;
-        const folderPath = parentDir?.endsWith('/') ? parentDir + newItemName : parentDir + '/' + newItemName;
+        const folderPath = parentDir?.endsWith('/') ? parentDir + folderName : parentDir + '/' + folderName;
         try {
             const result = await invoke<FileOpResult>('create_dir', { path: folderPath });
             if (result.success) {
@@ -189,34 +241,73 @@ export const FileTreeContainer: React.FC = () => {
                 <p className='text-xs uppercase'>
                     Explorer: {workspacePath?.split("/")[workspacePath?.split("/").length - 1] || ' No folder Opened'}
                 </p>
-                {/* <div className="flex items-center gap-1">
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2 hover:bg-accent flex items-center gap-1.5"
-                        onClick={() => setShowNewFileDialog(true)}
-                    >
-                        <Plus className="h-3.5 w-3.5" />
-                        <FileIcon className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2 hover:bg-accent flex items-center gap-1.5"
-                        onClick={() => setShowNewFolderDialog(true)}
-                    >
-                        <Plus className="h-3.5 w-3.5" />
+                {workspacePath && (
+                    <div className="flex items-center gap-1 text-xs">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 px-2 text-xs"
+                            onClick={() => handleLoadFolderDepth(2)}
+                            title="Load 2 levels deep"
+                        >
+                            2L
                         </Button>
-                        </div> */}
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 px-2 text-xs"
+                            onClick={() => handleLoadFolderDepth(3)}
+                            title="Load 3 levels deep"
+                        >
+                            3L
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 px-2 text-xs"
+                            onClick={handleLoadFullFolder}
+                            title="Load full folder structure"
+                        >
+                            All
+                        </Button>
+                    </div>
+                )}
                 <div className='flex items-center gap-2'>
-                    <FilePlusIcon size={18} />
-                    <FolderPlusIcon size={18} />
-                    <RotateCw size={18} />
+                    <FilePlusIcon size={18} onClick={() => { setNewFileInputActive(true); setNewFolderInputActive(false); setNewItemInputValue(""); }} className="cursor-pointer" />
+                    <FolderPlusIcon size={18} onClick={() => { setNewFolderInputActive(true); setNewFileInputActive(false); setNewItemInputValue(""); }} className="cursor-pointer" />
+                    <RotateCw size={18} onClick={handleIndexWorkspace} className="cursor-pointer" />
                     <CopyMinus size={18} />
                 </div>
             </div>
 
             <div className="p-2 h-screen overflow-auto">
+                {newFileInputActive || newFolderInputActive ? (
+                    <div className="mb-2 flex items-center gap-2">
+                        <input
+                            autoFocus
+                            className="border rounded px-2 py-1 text-sm w-full"
+                            placeholder={newFileInputActive ? "New file name..." : "New folder name..."}
+                            value={newItemInputValue}
+                            onChange={e => setNewItemInputValue(e.target.value)}
+                            onKeyDown={async e => {
+                                if (e.key === "Enter" && newItemInputValue.trim()) {
+                                    if (newFileInputActive) {
+                                        await handleCreateFile(newItemInputValue.trim());
+                                    } else if (newFolderInputActive) {
+                                        await handleCreateFolder(newItemInputValue.trim());
+                                    }
+                                    setNewFileInputActive(false);
+                                    setNewFolderInputActive(false);
+                                    setNewItemInputValue("");
+                                } else if (e.key === "Escape") {
+                                    setNewFileInputActive(false);
+                                    setNewFolderInputActive(false);
+                                    setNewItemInputValue("");
+                                }
+                            }}
+                        />
+                    </div>
+                ) : null}
                 {!workspacePath ? (
                     <div className="flex flex-col items-center justify-center h-full">
                         <Button
@@ -238,6 +329,8 @@ export const FileTreeContainer: React.FC = () => {
                         onRename={handleRename}
                         onDelete={handleDelete}
                         onMove={handleMove}
+                        onLoadDepth={handleLoadFolderDepthForPath}
+                        onLoadFull={handleLoadFullFolderForPath}
                     />
                 )}
             </div>

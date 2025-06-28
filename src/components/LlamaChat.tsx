@@ -14,6 +14,7 @@ import {
 } from "./ui/select";
 import { HistoryIcon, Plus, XIcon } from 'lucide-react';
 import { useEditorStore } from '@/store/editorStore';
+import { invoke } from '@tauri-apps/api/core';
 
 const ProgressBar = ({ progress }: { progress: number }) => (
   <div className="h-1 w-full overflow-hidden rounded-full bg-muted">
@@ -63,6 +64,7 @@ export const LlamaChat: React.FC<LlamaChatProps> = ({
     updateFile,
     deleteFile,
     readFile,
+    projectContext
   } = useChatExtensionsStore();
   const { setIsChatVisible } = useEditorStore();
   const [sessions, setSessions] = React.useState<Array<{ id: string; title: string }>>([]);
@@ -119,27 +121,42 @@ export const LlamaChat: React.FC<LlamaChatProps> = ({
     if (!isGenerating) {
       setError(null);
 
-      // Add file context if available
       let messageWithContext = userInput;
+
+      // Add project context
+      messageWithContext = `[Project Context]\n${projectContext}\n\n${messageWithContext}`;
+
+      // Add file context for active file
       if (activeFile) {
         try {
           const fileContent = await readFile(activeFile);
-          messageWithContext = `[File Context: ${activeFile}]\n\`\`\`\n${fileContent}\n\`\`\`\n\n${userInput}`;
+          const fileMetadata = await getFileMetadata(activeFile); // New function to get file metadata
+          messageWithContext = `[File: ${activeFile}]\n[Metadata: ${fileMetadata}]\n\`\`\`\n${fileContent}\n\`\`\`\n\n${messageWithContext}`;
         } catch (error) {
           console.error('Failed to read file context:', error);
         }
       }
 
-      // Add cursor/selection context if available
+      // Add cursor/selection context
       if (cursorPosition) {
-        messageWithContext = `[Cursor Position: Line ${cursorPosition.line}, Column ${cursorPosition.column}]\n${messageWithContext}`;
+        messageWithContext = `[Cursor: Line ${cursorPosition.line}, Column ${cursorPosition.column}]\n${messageWithContext}`;
       }
       if (selectedText) {
-        messageWithContext = `[Selected Text: ${selectedText}]\n${messageWithContext}`;
+        messageWithContext = `[Selected Text]\n\`\`\`\n${selectedText}\n\`\`\`\n\n${messageWithContext}`;
       }
 
       setUserInput(messageWithContext);
       handleSendMessage();
+    }
+  };
+
+  const getFileMetadata = async (filePath: string) => {
+    try {
+      const metadata = await invoke('get_file_metadata', { path: filePath });
+      return JSON.stringify(metadata);
+    } catch (error) {
+      console.error('Failed to get file metadata:', error);
+      return '';
     }
   };
 
@@ -385,14 +402,11 @@ export const LlamaChat: React.FC<LlamaChatProps> = ({
                 <SelectValue placeholder="Select a file" />
               </SelectTrigger>
               <SelectContent className="bg-gray-950">
-                {/* {useChatExtensionsStore.getState().files.map((file) => (
-                  <SelectItem key={file.id} value={file.id}>
-                    {file.name}
+                {projectContext && projectContext.split('\n').map((line, index) => (
+                  <SelectItem key={index} value={line}>
+                    {line}
                   </SelectItem>
-                ))} */}
-                {/* <SelectItem value="" disabled={!useChatExtensionsStore.getState().files.length}> */}
-                {/* No files available
-                </SelectItem> */}
+                ))}
               </SelectContent>
 
             </Select>

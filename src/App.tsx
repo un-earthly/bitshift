@@ -6,7 +6,6 @@ import {
 } from "react-resizable-panels";
 import { ChatSidebar } from './components/ChatSidebar';
 import { useFileSystem } from './hooks/useFileSystem';
-import { open } from '@tauri-apps/plugin-dialog';
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { EditorLayout } from './components/EditorLayout';
 import { FileTreeContainer } from './components/FileTreeContainer';

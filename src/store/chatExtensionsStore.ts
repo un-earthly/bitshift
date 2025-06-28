@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { invoke } from '@tauri-apps/api/core';
-import { writeFile, readTextFile, remove } from '@tauri-apps/plugin-fs';
+import { writeFile, readTextFile, remove, readDir } from '@tauri-apps/plugin-fs';
 
 interface ChatExtensionsState {
     // Cursor state
@@ -27,6 +27,11 @@ interface ChatExtensionsState {
     updateFile: (path: string, content: string) => Promise<void>;
     deleteFile: (path: string) => Promise<void>;
     readFile: (path: string) => Promise<string>;
+
+    // Project context
+    projectContext: string;
+    updateProjectContext: () => Promise<void>;
+    buildProjectContext: () => Promise<string>;
 }
 
 export const useChatExtensionsStore = create<ChatExtensionsState>((set, get) => ({
@@ -36,7 +41,7 @@ export const useChatExtensionsStore = create<ChatExtensionsState>((set, get) => 
     activeFile: null,
     lastTerminalId: null,
     isTerminalBusy: false,
-
+    projectContext: '',
     // State setters
     setCursorPosition: (position) => set({ cursorPosition: position }),
     setSelectedText: (text) => set({ selectedText: text }),
@@ -99,5 +104,19 @@ export const useChatExtensionsStore = create<ChatExtensionsState>((set, get) => 
             console.error('Failed to read file:', error);
             throw error;
         }
+    },
+
+    updateProjectContext: async () => {
+        set({ projectContext: await get().buildProjectContext() });
+    },
+
+    buildProjectContext: async () => {
+        const entries = await readDir('.',);
+        console.log({ entries });
+        const fileList = entries
+            .filter(entry => entry.name !== undefined)
+            .map(entry => entry.name)
+            .join('\n');
+        return `Project Structure:\n${fileList}`;
     },
 })); 

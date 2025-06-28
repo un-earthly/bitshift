@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Loader2 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { getIconForFile } from '@/lib/file-icons';
 import { FileContextMenu } from './ContextMenu';
@@ -10,6 +10,8 @@ interface FileNode {
   is_dir: boolean;
   children?: FileNode[];
   isExpanded?: boolean;
+  isLoading?: boolean;
+  hasLoadedChildren?: boolean;
 }
 
 interface FileTreeProps {
@@ -19,6 +21,8 @@ interface FileTreeProps {
   onRename?: (oldPath: string, newName: string) => Promise<void>;
   onDelete?: (path: string) => Promise<void>;
   onMove?: (sourcePath: string, targetPath: string) => Promise<void>;
+  onLoadDepth?: (path: string, depth: number) => Promise<void>;
+  onLoadFull?: (path: string) => Promise<void>;
   level?: number;
 }
 
@@ -34,6 +38,8 @@ const FileTree: React.FC<FileTreeProps> = ({
   onRename,
   onDelete,
   onMove,
+  onLoadDepth,
+  onLoadFull,
   level = 0
 }) => {
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
@@ -41,6 +47,23 @@ const FileTree: React.FC<FileTreeProps> = ({
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
   const treeRef = useRef<HTMLUListElement>(null);
+
+  // Sync expanded paths with node states
+  useEffect(() => {
+    const newExpandedPaths = new Set<string>();
+    const traverse = (nodes: FileNode[]) => {
+      nodes.forEach(node => {
+        if (node.isExpanded) {
+          newExpandedPaths.add(node.path);
+        }
+        if (node.children) {
+          traverse(node.children);
+        }
+      });
+    };
+    traverse(nodes);
+    setExpandedPaths(newExpandedPaths);
+  }, [nodes]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -65,6 +88,7 @@ const FileTree: React.FC<FileTreeProps> = ({
         case 'ArrowRight': {
           e.preventDefault();
           if (currentNode.is_dir) {
+            onFolderClick?.(currentNode.path);
             setExpandedPaths(prev => {
               const next = new Set(prev);
               next.add(currentNode.path);
@@ -216,6 +240,8 @@ const FileTree: React.FC<FileTreeProps> = ({
             onCopyPath={() => navigator.clipboard.writeText(node.path)}
             isDirectory={node.is_dir}
             fileName={node.name}
+            onLoadDepth={node.is_dir ? (depth) => onLoadDepth?.(node.path, depth) : undefined}
+            onLoadFull={node.is_dir ? () => onLoadFull?.(node.path) : undefined}
           >
             <div
               className={cn(
@@ -226,7 +252,7 @@ const FileTree: React.FC<FileTreeProps> = ({
                 draggedItem === node.path && "opacity-50",
                 dropTarget === node.path && "bg-accent/25 border border-accent"
               )}
-              onClick={(e) => {
+              onClick={() => {
                 setSelectedItem(node.path);
                 if (node.is_dir) {
                   onFolderClick?.(node.path);
@@ -252,12 +278,16 @@ const FileTree: React.FC<FileTreeProps> = ({
             >
               {node.is_dir ? (
                 <>
-                  <ChevronRight
-                    className={cn(
-                      "h-4 w-4 transition-transform shrink-0",
-                      expandedPaths.has(node.path) && "transform rotate-90"
-                    )}
-                  />
+                  {node.isLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+                  ) : (
+                    <ChevronRight
+                      className={cn(
+                        "h-4 w-4 transition-transform shrink-0",
+                        expandedPaths.has(node.path) && "transform rotate-90"
+                      )}
+                    />
+                  )}
                   {renderIcon(node)}
                   <span className="truncate">{node.name}</span>
                 </>
@@ -279,6 +309,8 @@ const FileTree: React.FC<FileTreeProps> = ({
               onRename={onRename}
               onDelete={onDelete}
               onMove={onMove}
+              onLoadDepth={onLoadDepth}
+              onLoadFull={onLoadFull}
               level={level + 1}
             />
           )}
