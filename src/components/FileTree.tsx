@@ -3,6 +3,8 @@ import { ChevronRight, Loader2 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { getIconForFile } from '@/lib/file-icons';
 import { FileContextMenu } from './ContextMenu';
+import { ClipboardService } from '@/lib/clipboard';
+import { toast } from 'sonner';
 
 interface FileNode {
   name: string;
@@ -65,118 +67,51 @@ const FileTree: React.FC<FileTreeProps> = ({
     setExpandedPaths(newExpandedPaths);
   }, [nodes]);
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (!selectedItem) return;
 
-      const currentNode = nodes.find(node => node.path === selectedItem);
-      if (!currentNode) return;
+  // const findNextNode = (nodes: FileNode[], currentPath: string): FileNode | null => {
+  //   let found = false;
+  //   let result: FileNode | null = null;
 
-      switch (e.key) {
-        case 'ArrowDown': {
-          e.preventDefault();
-          const nextNode = findNextNode(nodes, selectedItem);
-          if (nextNode) setSelectedItem(nextNode.path);
-          break;
-        }
-        case 'ArrowUp': {
-          e.preventDefault();
-          const prevNode = findPrevNode(nodes, selectedItem);
-          if (prevNode) setSelectedItem(prevNode.path);
-          break;
-        }
-        case 'ArrowRight': {
-          e.preventDefault();
-          if (currentNode.is_dir) {
-            onFolderClick?.(currentNode.path);
-            setExpandedPaths(prev => {
-              const next = new Set(prev);
-              next.add(currentNode.path);
-              return next;
-            });
-          }
-          break;
-        }
-        case 'ArrowLeft': {
-          e.preventDefault();
-          if (currentNode.is_dir) {
-            setExpandedPaths(prev => {
-              const next = new Set(prev);
-              next.delete(currentNode.path);
-              return next;
-            });
-          }
-          break;
-        }
-        case 'Enter': {
-          e.preventDefault();
-          if (currentNode.is_dir) {
-            onFolderClick?.(currentNode.path);
-            setExpandedPaths(prev => {
-              const next = new Set(prev);
-              if (next.has(currentNode.path)) {
-                next.delete(currentNode.path);
-              } else {
-                next.add(currentNode.path);
-              }
-              return next;
-            });
-          } else {
-            onFileClick(currentNode.path);
-          }
-          break;
-        }
-      }
-    };
+  //   const traverse = (nodes: FileNode[]) => {
+  //     for (const node of nodes) {
+  //       if (found && !result) {
+  //         result = node;
+  //         return;
+  //       }
+  //       if (node.path === currentPath) {
+  //         found = true;
+  //       }
+  //       if (node.is_dir && expandedPaths.has(node.path) && node.children) {
+  //         traverse(node.children);
+  //       }
+  //     }
+  //   };
 
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [selectedItem, nodes, onFileClick, onFolderClick]);
+  //   traverse(nodes);
+  //   return result;
+  // };
 
-  const findNextNode = (nodes: FileNode[], currentPath: string): FileNode | null => {
-    let found = false;
-    let result: FileNode | null = null;
+  // const findPrevNode = (nodes: FileNode[], currentPath: string): FileNode | null => {
+  //   let prev: FileNode | null = null;
+  //   let found = false;
 
-    const traverse = (nodes: FileNode[]) => {
-      for (const node of nodes) {
-        if (found && !result) {
-          result = node;
-          return;
-        }
-        if (node.path === currentPath) {
-          found = true;
-        }
-        if (node.is_dir && expandedPaths.has(node.path) && node.children) {
-          traverse(node.children);
-        }
-      }
-    };
+  //   const traverse = (nodes: FileNode[]) => {
+  //     for (const node of nodes) {
+  //       if (node.path === currentPath) {
+  //         found = true;
+  //         return;
+  //       }
+  //       prev = node;
+  //       if (node.is_dir && expandedPaths.has(node.path) && node.children) {
+  //         traverse(node.children);
+  //         if (found) return;
+  //       }
+  //     }
+  //   };
 
-    traverse(nodes);
-    return result;
-  };
-
-  const findPrevNode = (nodes: FileNode[], currentPath: string): FileNode | null => {
-    let prev: FileNode | null = null;
-    let found = false;
-
-    const traverse = (nodes: FileNode[]) => {
-      for (const node of nodes) {
-        if (node.path === currentPath) {
-          found = true;
-          return;
-        }
-        prev = node;
-        if (node.is_dir && expandedPaths.has(node.path) && node.children) {
-          traverse(node.children);
-          if (found) return;
-        }
-      }
-    };
-
-    traverse(nodes);
-    return prev;
-  };
+  //   traverse(nodes);
+  //   return prev;
+  // };
 
   const handleRename = async (path: string, newName: string) => {
     try {
@@ -237,7 +172,15 @@ const FileTree: React.FC<FileTreeProps> = ({
           <FileContextMenu
             onRename={(newName) => handleRename(node.path, newName)}
             onDelete={() => handleDelete(node.path)}
-            onCopyPath={() => navigator.clipboard.writeText(node.path)}
+            onCopyPath={async () => {
+              try {
+                await ClipboardService.writeText(node.path);
+                toast.success('Path copied to clipboard');
+              } catch (error) {
+                console.error('Failed to copy path:', error);
+                toast.error('Failed to copy path to clipboard');
+              }
+            }}
             isDirectory={node.is_dir}
             fileName={node.name}
             onLoadDepth={node.is_dir ? (depth) => onLoadDepth?.(node.path, depth) : undefined}

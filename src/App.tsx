@@ -5,12 +5,9 @@ import {
   PanelResizeHandle,
 } from "react-resizable-panels";
 import { ChatSidebar } from './components/ChatSidebar';
-import { useFileSystem } from './hooks/useFileSystem';
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { EditorLayout } from './components/EditorLayout';
 import { FileTreeContainer } from './components/FileTreeContainer';
-import { useKeybindings } from './hooks/useKeybindings';
-import { useCommandRegistry } from './commands/registry';
 import { useContextKeys } from './commands/contextKeys';
 import { Toaster } from 'sonner';
 import { ProjectInitDialog } from './components/ProjectInitDialog';
@@ -18,26 +15,11 @@ import './App.css';
 import { useEditorStore } from './store/editorStore';
 
 const App: React.FC = () => {
-  const [isSidebarVisible, setIsSidebarVisible] = useState(true);
   const [showInitDialog, setShowInitDialog] = useState(true);
-  const {
-    tree,
-    loadFolder,
-    toggleFolder,
-    workspacePath,
-    createNewFile,
-    createNewFolder,
-    saveCurrentFile,
-    saveFileAs,
-    closeCurrentFile,
-  } = useFileSystem();
+
   const { isChatVisible, setIsChatVisible } = useEditorStore()
-  const registerCommand = useCommandRegistry(state => state.registerCommand);
-  const unregisterCommand = useCommandRegistry(state => state.unregisterCommand);
   const setContext = useContextKeys(state => state.setContext);
 
-  // Initialize keybindings
-  useKeybindings();
 
   // Initialize contexts
   useEffect(() => {
@@ -46,49 +28,10 @@ const App: React.FC = () => {
     setContext('editorFocus', true);
     setContext('terminalFocus', false);
     setContext('chatFocus', false);
-    setContext('sidebarVisible', isSidebarVisible);
     // setContext('chatVisible', isChatVisible);
-  }, [setContext, isSidebarVisible]);
+  }, [setContext]);
 
 
-
-  useEffect(() => {
-    // Register file-related commands
-    // registerCommand('workbench.action.files.openFile', handleOpenFolder);
-    registerCommand('workbench.action.files.newFolder', async () => {
-      if (!workspacePath) return;
-      const folderName = 'new-folder';
-      await createNewFolder(`${workspacePath}/${folderName}`);
-    });
-
-    registerCommand('workbench.action.files.save', saveCurrentFile);
-    registerCommand('workbench.action.files.saveAs', saveFileAs);
-    registerCommand('workbench.action.files.close', closeCurrentFile);
-    registerCommand('workbench.action.quit', () => window.close());
-
-    // Register workbench commands
-    registerCommand('workbench.action.toggleSidebarVisibility', () => {
-      setIsSidebarVisible(!isSidebarVisible);
-      setContext('sidebarVisible', !isSidebarVisible);
-    });
-
-    registerCommand('workbench.action.toggleChat', () => {
-      setIsChatVisible(!isChatVisible);
-      setContext('chatVisible', !isChatVisible);
-    });
-
-    return () => {
-      unregisterCommand('workbench.action.files.openFile');
-      unregisterCommand('workbench.action.files.newFolder');
-      unregisterCommand('workbench.action.files.save');
-      unregisterCommand('workbench.action.files.saveAs');
-      unregisterCommand('workbench.action.files.close');
-      unregisterCommand('workbench.action.quit');
-      unregisterCommand('workbench.action.toggleSidebarVisibility');
-      unregisterCommand('workbench.action.toggleChat');
-    };
-  }, [registerCommand, unregisterCommand, workspacePath, createNewFile, createNewFolder,
-    saveCurrentFile, saveFileAs, closeCurrentFile, isSidebarVisible, isChatVisible, setContext]);
 
   useEffect(() => {
     const checkDetachedWindow = async () => {
@@ -124,57 +67,25 @@ const App: React.FC = () => {
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-background">
       <Toaster richColors position="top-right" />
-      <ProjectInitDialog
+      {/* <ProjectInitDialog
         open={showInitDialog}
         onOpenChange={setShowInitDialog}
-      />
-
-      {/* Top Bar */}
-      {/* <div className="absolute top-0 z-10 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="flex h-14 items-center gap-4 px-4">
-          <Button onClick={handleOpenFolder} variant="outline" size="sm" className="gap-2">
-            <FolderOpen className="h-4 w-4" />
-            Open Folder
-          </Button>
-          <Separator orientation="vertical" className="h-6" />
-          <div className="ml-auto flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsChatVisible(!isChatVisible)}
-              className="h-8 w-8"
-            >
-              <MessageSquare className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-              className="h-8 w-8"
-            >
-              {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
-            </Button>
-          </div>
-        </div>
-      </div> */}
-
+      /> */}
       {/* Main Content */}
       <PanelGroup direction="horizontal" autoSaveId="app-layout">
-        {isSidebarVisible && (
-          <>
-            <Panel id="filetree" defaultSize={15} minSize={10} maxSize={30}>
-              <div className="h-full border-r border-border/40">
-                <FileTreeContainer />
-              </div>
-            </Panel>
-            <PanelResizeHandle className="w-1.5 bg-border/40 hover:bg-border/60 transition-colors" />
-          </>
-        )}
+        <>
+          <Panel id="filetree" defaultSize={15} minSize={10} maxSize={30}>
+            <div className="h-full border-r border-border/40">
+              <FileTreeContainer />
+            </div>
+          </Panel>
+          <PanelResizeHandle className="w-1.5 bg-border/40 hover:bg-border/60 transition-colors" />
+        </>
 
         {/* Editor */}
         <Panel
           id="editor"
-          defaultSize={isSidebarVisible ? (isChatVisible ? 65 : 85) : (isChatVisible ? 80 : 100)}
+          defaultSize={85}
           minSize={40}
         >
           <EditorLayout />

@@ -23,7 +23,6 @@
       "capabilities": []
     }
   },
-  
   "bundle": {
     "active": true,
     "targets": "all",
@@ -124,6 +123,9 @@
     },
     "shell": {
       "open": true
+    },
+    "clipboard-manager": {
+      "enable": true
     }
   }
 }

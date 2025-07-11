@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { useEditorStore } from '@/store/editorStore';
 import EditorView from './EditorView';
+import { AICodeToolbar } from './AICodeToolbar';
 import { Button } from './ui/button';
 import {
     Maximize2,
@@ -15,8 +16,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import TerminalComponent from './Terminal';
-import { useCommandRegistry } from '@/commands/registry';
 import { useTerminal } from '@/hooks/useTerminal';
+import { MonacoAIProvider } from '@/services/monacoAIProvider';
 
 interface TerminalInstance {
     id: string;
@@ -32,6 +33,9 @@ export const EditorLayout: React.FC = () => {
         direction: 'horizontal',
         panels: [[]]
     });
+    const [aiProviders, setAiProviders] = useState<Map<string, MonacoAIProvider>>(new Map());
+    const [isGenerating, setIsGenerating] = useState(false);
+
     const {
         layout,
         closeTab,
@@ -39,12 +43,7 @@ export const EditorLayout: React.FC = () => {
         splitPane,
         closePane,
         updateContent,
-        closeAllTabs,
-        closeAllPanes,
-        closeTabsInPane
     } = useEditorStore();
-    const registerCommand = useCommandRegistry(state => state.registerCommand);
-    const unregisterCommand = useCommandRegistry(state => state.unregisterCommand);
     const { closeTerminal } = useTerminal();
 
     const createTerminal = () => {
@@ -109,147 +108,173 @@ export const EditorLayout: React.FC = () => {
         setIsTerminalVisible(true);
     };
 
-    useEffect(() => {
-        // Register terminal commands
-        registerCommand('workbench.action.togglePanel', () => {
-            if (!isTerminalVisible) {
-                if (terminals.length === 0) {
-                    createTerminal();
+    // AI Code Generation handlers - memoized to prevent infinite loops
+    const handleTriggerSuggestion = useCallback(async () => {
+        const activePane = layout.panes.find(pane => pane.activeTabId);
+        if (activePane) {
+            const provider = aiProviders.get(activePane.id);
+            if (provider) {
+                setIsGenerating(true);
+                try {
+                    await provider.triggerAISuggestion();
+                } finally {
+                    setIsGenerating(false);
                 }
-                setIsTerminalVisible(true);
-            } else {
-                setIsTerminalVisible(false);
             }
-        });
-        registerCommand('workbench.action.terminal.toggleTerminal', () => {
-            if (!isTerminalVisible) {
-                if (terminals.length === 0) {
-                    createTerminal();
+        }
+    }, [layout.panes, aiProviders]);
+
+    const handleGenerateFunction = useCallback(async () => {
+        const activePane = layout.panes.find(pane => pane.activeTabId);
+        if (activePane) {
+            const provider = aiProviders.get(activePane.id);
+            if (provider) {
+                setIsGenerating(true);
+                try {
+                    await provider.generateFunction();
+                } finally {
+                    setIsGenerating(false);
                 }
-                setIsTerminalVisible(true);
-            } else {
-                setIsTerminalVisible(false);
             }
-        });
-        registerCommand('workbench.action.terminal.split', () => splitTerminal('horizontal'));
-        registerCommand('workbench.action.terminal.splitVertical', () => splitTerminal('vertical'));
-        registerCommand('workbench.action.terminal.new', createTerminal);
-        registerCommand('workbench.action.terminal.kill', () => {
-            if (terminals.length > 0) {
-                handleTerminalClose(terminals[terminals.length - 1].id);
+        }
+    }, [layout.panes, aiProviders]);
+
+    const handleGenerateClass = useCallback(async () => {
+        const activePane = layout.panes.find(pane => pane.activeTabId);
+        if (activePane) {
+            const provider = aiProviders.get(activePane.id);
+            if (provider) {
+                setIsGenerating(true);
+                try {
+                    await provider.generateClass();
+                } finally {
+                    setIsGenerating(false);
+                }
             }
-        });
+        }
+    }, [layout.panes, aiProviders]);
 
-        // Register split editor commands
-        registerCommand('workbench.action.splitEditor', (paneId: string) => splitPane(paneId, 'vertical'));
-        registerCommand('workbench.action.splitEditorDown', (paneId: string) => splitPane(paneId, 'horizontal'));
-
-        // Register window/editor closing commands
-        registerCommand('workbench.action.closeActiveEditor', (paneId: string, tabId: string) => {
-            closeTab(paneId, tabId);
-        });
-        registerCommand('workbench.action.closeAllEditors', () => {
-            closeAllTabs();
-        });
-        registerCommand('workbench.action.closeAllGroups', () => {
-            closeAllPanes();
-        });
-        registerCommand('workbench.action.closeEditorsInGroup', (paneId: string) => {
-            closeTabsInPane(paneId);
-        });
-        registerCommand('workbench.action.closeGroup', (paneId: string) => {
-            if (layout.panes.length > 1) {
-                closePane(paneId);
+    const handleGenerateImports = useCallback(async () => {
+        const activePane = layout.panes.find(pane => pane.activeTabId);
+        if (activePane) {
+            const provider = aiProviders.get(activePane.id);
+            if (provider) {
+                setIsGenerating(true);
+                try {
+                    await provider.generateImports();
+                } finally {
+                    setIsGenerating(false);
+                }
             }
+        }
+    }, [layout.panes, aiProviders]);
+
+    // Register AI provider for a pane
+    const registerAIProvider = useCallback((paneId: string, provider: MonacoAIProvider) => {
+        setAiProviders(prev => {
+            // Don't re-register if already exists
+            if (prev.has(paneId)) {
+                return prev;
+            }
+            return new Map(prev).set(paneId, provider);
         });
+    }, []);
 
-        // Cleanup on unmount
-        return () => {
-            unregisterCommand('workbench.action.terminal.toggleTerminal');
-            unregisterCommand('workbench.action.terminal.split');
-            unregisterCommand('workbench.action.terminal.splitVertical');
-            unregisterCommand('workbench.action.terminal.new');
-            unregisterCommand('workbench.action.terminal.kill');
-            unregisterCommand('workbench.action.splitEditor');
-            unregisterCommand('workbench.action.splitEditorDown');
-            unregisterCommand('workbench.action.closeActiveEditor');
-            unregisterCommand('workbench.action.closeAllEditors');
-            unregisterCommand('workbench.action.closeAllGroups');
-            unregisterCommand('workbench.action.closeEditorsInGroup');
-            unregisterCommand('workbench.action.closeGroup');
-        };
-    }, [registerCommand, unregisterCommand, terminals.length, isTerminalVisible, splitPane, closePane, closeTab, closeAllTabs, closeAllPanes, closeTabsInPane, layout.panes.length]);
+    // Unregister AI provider for a pane
+    const unregisterAIProvider = useCallback((paneId: string) => {
+        setAiProviders(prev => {
+            const newMap = new Map(prev);
+            newMap.delete(paneId);
+            return newMap;
+        });
+    }, []);
 
-    const toggleTerminal = () => setIsTerminalVisible(prev => !prev);
+    // Memoize terminal functions to prevent infinite loops
+    const memoizedToggleTerminal = useCallback(() => setIsTerminalVisible(prev => !prev), []);
 
-    const renderTabs = (paneId: string, tabs: any[], activeTabId: string | null) => (
-        <div className="flex items-center h-10 gap-1 px-2 border-b border-border overflow-x-auto scrollbar-none bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-            {tabs.map(tab => (
-                <div
-                    key={tab.id}
-                    className={cn(
-                        "group flex items-center gap-2 px-3 py-1.5 text-sm rounded-md cursor-pointer",
-                        "hover:bg-accent/50 transition-colors duration-150",
-                        activeTabId === tab.id && "dark:bg-gray-800 rounded-none text-accent-foreground font-medium border-b-2 border-teal-400"
-                    )}
-                    onClick={() => setActiveTab(paneId, tab.id)}
-                >
-                    <span className="truncate max-w-[120px]">
-                        {tab.filePath.split('/').pop()}
-                    </span>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-4 w-4 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            closeTab(paneId, tab.id);
-                        }}
+
+    const toggleTerminal = memoizedToggleTerminal;
+
+    const renderTabs = useCallback((paneId: string, tabs: any[], activeTabId: string | null) => (
+        <div className="flex flex-col">
+            {/* AI Toolbar */}
+            <AICodeToolbar
+                onTriggerSuggestion={handleTriggerSuggestion}
+                onGenerateFunction={handleGenerateFunction}
+                onGenerateClass={handleGenerateClass}
+                onGenerateImports={handleGenerateImports}
+                isGenerating={isGenerating}
+            />
+
+            {/* Tabs */}
+            <div className="flex items-center h-10 gap-1 px-2 border-b border-border overflow-x-auto scrollbar-none bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+                {tabs.map(tab => (
+                    <div
+                        key={tab.id}
+                        className={cn(
+                            "group flex items-center gap-2 px-3 py-1.5 text-sm rounded-md cursor-pointer",
+                            "hover:bg-accent/50 transition-colors duration-150",
+                            activeTabId === tab.id && "dark:bg-gray-800 rounded-none text-accent-foreground font-medium border-b-2 border-teal-400"
+                        )}
+                        onClick={() => setActiveTab(paneId, tab.id)}
                     >
-                        <X className="h-3 w-3" />
-                    </Button>
-                </div>
-            ))}
-            <div className="ml-auto flex items-center gap-1">
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6"
-                    onClick={toggleTerminal}
-                >
-                    <TerminalIcon className="h-4 w-4" />
-                </Button>
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6"
-                    onClick={() => splitPane(paneId, 'vertical')}
-                >
-                    <SplitSquareVertical className="h-4 w-4" />
-                </Button>
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6"
-                    onClick={() => splitPane(paneId, 'horizontal')}
-                >
-                    <SplitSquareHorizontal className="h-4 w-4" />
-                </Button>
-                {layout.panes.length > 1 && (
+                        <span className="truncate max-w-[120px]">
+                            {tab.filePath.split('/').pop()}
+                        </span>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                closeTab(paneId, tab.id);
+                            }}
+                        >
+                            <X className="h-3 w-3" />
+                        </Button>
+                    </div>
+                ))}
+                <div className="ml-auto flex items-center gap-1">
                     <Button
                         variant="ghost"
                         size="icon"
                         className="h-6 w-6"
-                        onClick={() => closePane(paneId)}
+                        onClick={toggleTerminal}
                     >
-                        <X className="h-4 w-4" />
+                        <TerminalIcon className="h-4 w-4" />
                     </Button>
-                )}
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => splitPane(paneId, 'vertical')}
+                    >
+                        <SplitSquareVertical className="h-4 w-4" />
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => splitPane(paneId, 'horizontal')}
+                    >
+                        <SplitSquareHorizontal className="h-4 w-4" />
+                    </Button>
+                    {layout.panes.length > 1 && (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => closePane(paneId)}
+                        >
+                            <X className="h-4 w-4" />
+                        </Button>
+                    )}
+                </div>
             </div>
         </div>
-    );
+    ), [handleTriggerSuggestion, handleGenerateFunction, handleGenerateClass, handleGenerateImports, isGenerating, setActiveTab, closeTab, toggleTerminal, splitPane, closePane, layout.panes.length]);
 
-    const renderPane = (pane: any) => (
+    const renderPane = useCallback((pane: any) => (
         <div key={pane.id} className="h-full flex flex-col">
             {renderTabs(pane.id, pane.tabs, pane.activeTabId)}
             <div className="flex-1 min-h-0">
@@ -259,6 +284,8 @@ export const EditorLayout: React.FC = () => {
                         filePath={pane.tabs.find((t: any) => t.id === pane.activeTabId)?.filePath || ''}
                         content={pane.tabs.find((t: any) => t.id === pane.activeTabId)?.content || ''}
                         onChange={(content) => updateContent(pane.id, pane.activeTabId, content)}
+                        onAIProviderReady={(provider) => registerAIProvider(pane.id, provider)}
+                        onAIProviderDispose={() => unregisterAIProvider(pane.id)}
                     />
                 ) : (
                     <div className="flex h-full flex-col items-center justify-center gap-4 text-muted-foreground">
@@ -268,7 +295,7 @@ export const EditorLayout: React.FC = () => {
                 )}
             </div>
         </div>
-    );
+    ), [renderTabs, updateContent, registerAIProvider, unregisterAIProvider]);
 
     return (
         <PanelGroup direction="vertical">

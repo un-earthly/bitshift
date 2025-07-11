@@ -57,12 +57,8 @@ export const LlamaChat: React.FC<LlamaChatProps> = ({
     cursorPosition,
     selectedText,
     activeFile,
-    lastTerminalId,
-    isTerminalBusy,
     runTerminalCommand,
-    createFile,
     updateFile,
-    deleteFile,
     readFile,
     projectContext
   } = useChatExtensionsStore();

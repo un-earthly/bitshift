@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs';
 import { useEditorStore } from '@/store/editorStore';
 import { useFileSystem } from '@/hooks/useFileSystem';
@@ -11,7 +11,6 @@ import {
     CopyMinus,
 } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
-import { handleKeyboardShortcut, ShortcutHandlers } from '@/lib/keyboard-shortcuts';
 import { toast } from 'sonner';
 import { open } from '@tauri-apps/plugin-dialog';
 
@@ -33,27 +32,12 @@ export const FileTreeContainer: React.FC = () => {
         tree: nodes
     } = useFileSystem();
     const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
-    const [showNewFileDialog, setShowNewFileDialog] = useState(false);
-    const [showNewFolderDialog, setShowNewFolderDialog] = useState(false);
     const [newItemName, setNewItemName] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [newFileInputActive, setNewFileInputActive] = useState(false);
     const [newFolderInputActive, setNewFolderInputActive] = useState(false);
     const [newItemInputValue, setNewItemInputValue] = useState("");
 
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            const handlers: ShortcutHandlers = {
-                onNewFile: () => setShowNewFileDialog(true),
-                onNewFolder: () => setShowNewFolderDialog(true),
-                onRefresh: handleIndexWorkspace,
-            };
-            handleKeyboardShortcut(e, handlers);
-        };
-
-        document.addEventListener('keydown', handleKeyDown);
-        return () => document.removeEventListener('keydown', handleKeyDown);
-    }, []);
 
     const handleFileClick = async (path: string) => {
         try {
@@ -156,7 +140,6 @@ export const FileTreeContainer: React.FC = () => {
         try {
             await writeTextFile(filePath, '');
             await refreshFolder(parentDir as string);
-            setShowNewFileDialog(false);
             setNewItemName('');
             openFile(filePath, '');
             toast.success('File created successfully');
@@ -174,7 +157,6 @@ export const FileTreeContainer: React.FC = () => {
             const result = await invoke<FileOpResult>('create_dir', { path: folderPath });
             if (result.success) {
                 await refreshFolder(parentDir as string);
-                setShowNewFolderDialog(false);
                 setNewItemName('');
                 toast.success(result.message);
             } else {
@@ -233,7 +215,7 @@ export const FileTreeContainer: React.FC = () => {
             toast.error('Failed to move item');
         }
     };
-
+    if (isLoading) { }
     return (
         <div className="relative flex flex-col h-full bg-background">
 

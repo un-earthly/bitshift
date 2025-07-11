@@ -21,6 +21,8 @@ import { useChatState } from '@/hooks/useChatState';
 import { appDataDir, join } from '@tauri-apps/api/path';
 import { create, exists, readDir } from '@tauri-apps/plugin-fs';
 import { ModelInfo } from '@/services/modelManager';
+import { ClipboardService } from '@/lib/clipboard';
+import { toast } from 'sonner';
 
 interface ProjectInitDialogProps {
     open: boolean;
@@ -128,10 +130,11 @@ export function ProjectInitDialog({ open, onOpenChange }: ProjectInitDialogProps
 
     const copyMarkdown = async (markdown: string) => {
         try {
-            await navigator.clipboard.writeText(markdown);
-            // You could add a toast notification here
+            await ClipboardService.writeText(markdown);
+            toast.success('Copied to clipboard');
         } catch (err) {
             console.error('Failed to copy:', err);
+            toast.error('Failed to copy to clipboard');
         }
     };
 

@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { open } from '@tauri-apps/plugin-dialog';
 export interface EditorTab {
     id: string;
     filePath: string;
