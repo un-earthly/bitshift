@@ -1,7 +1,7 @@
-import { Command } from '@tauri-apps/plugin-shell';
+import { WebLLMProvider } from './llmProviders/webllmProvider';
 
 export interface LLMConfig {
-  model_path: string;
+  model_path: string; // For WebLLM, this is the model identifier (e.g., MLC model name)
   context_size: number;
   temperature: number;
   top_p: number;
@@ -17,37 +17,22 @@ class LLMService {
     max_tokens: 256,
   };
 
-  async loadModel(modelPath: string): Promise<void> {
-    this.config.model_path = modelPath;
+  private provider: WebLLMProvider | null = null;
 
+  async loadModel(modelId: string): Promise<void> {
+    // modelId corresponds to WebLLM model identifier (e.g., "Llama-3.2-1B-Instruct-q4f32_1-MLC")
+    this.config.model_path = modelId;
     try {
-      const command = Command.sidecar('runtime/llama-cpp/bin/llama-server', [
-        '--model', modelPath,
-        '--ctx-size', '2048',
-        '--port', '8080',
-        '--chat-template', 'llama3'
-      ]);
-      
-      command.on('close', (data: { code: number | null; signal: number | null }) => {
-        console.log(`Server finished with code ${data.code} and signal ${data.signal}`);
+      if (!this.provider) this.provider = new WebLLMProvider();
+      await this.provider.init({
+        model: modelId,
+        temperature: this.config.temperature,
+        top_p: this.config.top_p,
+        max_tokens: this.config.max_tokens,
       });
-      
-      command.on('error', (error: string) => {
-        console.error(`Server error: "${error}"`);
-      });
-      
-      command.stdout.on('data', (line: string) => {
-        console.log(`Server stdout: "${line}"`);
-      });
-      
-      command.stderr.on('data', (line: string) => {
-        console.log(`Server stderr: "${line}"`);
-      });
-
-      const child = await command.spawn();
-      console.log('Server started with PID:', child.pid);
+      console.log('WebLLM initialized with model:', modelId);
     } catch (error) {
-      console.error('Failed to start llama server:', error);
+      console.error('Failed to initialize WebLLM:', error);
       throw error;
     }
   }
@@ -62,77 +47,21 @@ class LLMService {
     onComplete: () => void
   ): Promise<void> {
     try {
-      const response = await fetch("http://127.0.0.1:8080/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          messages,
-          max_tokens: this.config.max_tokens,
-          temperature: this.config.temperature,
-          top_p: this.config.top_p,
-          stream: true,
-        }),
-      });
-
-      if (!response.body) {
-        throw new Error("Response body is null");
+      if (!this.provider) {
+        throw new Error('Provider not initialized. Call loadModel() first.');
       }
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) {
-          break;
-        }
-
-        buffer += decoder.decode(value, { stream: true });
-        
-        let boundary = buffer.indexOf('\n\n');
-        while(boundary !== -1) {
-          const message = buffer.substring(0, boundary);
-          buffer = buffer.substring(boundary + 2);
-
-          if (message.startsWith("data: ")) {
-            const jsonData = message.substring(5).trim();
-            if (jsonData === '[DONE]') {
-              onComplete();
-              return;
-            }
-
-            try {
-              const parsed = JSON.parse(jsonData);
-              const choice = parsed.choices && parsed.choices[0];
-              if (choice) {
-                if (choice.delta && choice.delta.content) {
-                  onToken(choice.delta.content);
-                }
-                if (choice.finish_reason) {
-                  onComplete();
-                  return;
-                }
-              }
-            } catch (e) {
-              console.error("Failed to parse SSE data:", jsonData, e);
-            }
-          }
-          boundary = buffer.indexOf('\n\n');
-        }
-      }
-      onComplete();
+      await this.provider.generate(messages, onToken, onComplete);
     } catch (error) {
-      console.error("Error generating completion:", error);
-      onComplete(); // Ensure we always call onComplete
-      throw new Error("Failed to generate completion from server.");
+      console.error('Error generating completion via WebLLM:', error);
+      onComplete();
+      throw error;
     }
   }
 
   async stopGeneration(): Promise<void> {
-    console.log("Stopping generation is not implemented for server mode yet.");
+    if (this.provider) {
+      await this.provider.stop();
+    }
   }
 }
 
