@@ -85,6 +85,7 @@
         }
       ]
     },
-    "os:default"
+    "os:default",
+    "clipboard-manager:default"
   ]
 }

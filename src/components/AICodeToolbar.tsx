@@ -10,6 +10,7 @@ import {
     Zap
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import WebLLMModelSelector from './WebLLMModelSelector';
 
 interface AICodeToolbarProps {
     onTriggerSuggestion: () => void;
@@ -29,6 +30,7 @@ export const AICodeToolbar: React.FC<AICodeToolbarProps> = ({
     className
 }) => {
     const [showTooltip, setShowTooltip] = useState<string | null>(null);
+    const [showSettings, setShowSettings] = useState<boolean>(false);
 
     const buttons = [
         {
@@ -117,15 +119,29 @@ export const AICodeToolbar: React.FC<AICodeToolbarProps> = ({
                     variant="ghost"
                     size="sm"
                     className="h-8 px-2 text-xs"
-                    onClick={() => {
-                        // TODO: Open AI settings
-                        console.log('Open AI settings');
-                    }}
+                    onClick={() => setShowSettings(true)}
                 >
                     <Settings className="h-3 w-3" />
                     <span className="hidden sm:inline ml-1">Settings</span>
                 </Button>
             </div>
+            {showSettings && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center">
+                    <div
+                        className="absolute inset-0 bg-black/40"
+                        onClick={() => setShowSettings(false)}
+                    />
+                    <div className="relative bg-background border border-border rounded-md shadow-xl w-[680px] max-w-[95vw] max-h-[85vh] overflow-auto p-4">
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="text-sm font-medium">AI Settings</div>
+                            <Button variant="ghost" size="sm" onClick={() => setShowSettings(false)}>
+                                Close
+                            </Button>
+                        </div>
+                        <WebLLMModelSelector onLoaded={() => setShowSettings(false)} />
+                    </div>
+                </div>
+            )}
         </div>
     );
 }; 

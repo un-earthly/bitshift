@@ -47,8 +47,6 @@ class AICodeGenerationService {
         }
 
         const {
-            maxTokens = 100,
-            temperature = 0.3,
             includeContext = true,
             suggestionType = 'completion'
         } = options;
@@ -108,12 +106,8 @@ class AICodeGenerationService {
      */
     async generateFunction(
         context: CodeContext,
-        functionName?: string
     ): Promise<CodeSuggestion[]> {
-        const prompt = functionName
-            ? `Generate a complete function implementation for "${functionName}" based on the context:`
-            : 'Generate a complete function based on the context:';
-
+    
         return this.generateCompletion(context, {
             suggestionType: 'function',
             maxTokens: 200,
@@ -126,11 +120,7 @@ class AICodeGenerationService {
      */
     async generateClass(
         context: CodeContext,
-        className?: string
     ): Promise<CodeSuggestion[]> {
-        const prompt = className
-            ? `Generate a complete class implementation for "${className}" based on the context:`
-            : 'Generate a complete class based on the context:';
 
         return this.generateCompletion(context, {
             suggestionType: 'class',
@@ -144,7 +134,6 @@ class AICodeGenerationService {
      */
     async generateImports(
         context: CodeContext,
-        moduleName?: string
     ): Promise<CodeSuggestion[]> {
         return this.generateCompletion(context, {
             suggestionType: 'import',
@@ -232,40 +221,6 @@ Focus on generating ${suggestionType} that:
 - Is well-documented when appropriate
 
 Only generate the code, no explanations or markdown formatting.`;
-    }
-
-    /**
-     * Analyze code context to provide better suggestions
-     */
-    private analyzeContext(context: CodeContext): {
-        isInFunction: boolean;
-        isInClass: boolean;
-        isInImport: boolean;
-        indentLevel: number;
-        expectedReturnType?: string;
-    } {
-        const currentLine = context.currentLine;
-        const surroundingLines = context.surroundingLines;
-
-        // Basic context analysis
-        const isInFunction = surroundingLines.some(line =>
-            line.includes('function') || line.includes('=>') || line.includes('def ')
-        );
-
-        const isInClass = surroundingLines.some(line =>
-            line.includes('class ') || line.includes('interface ')
-        );
-
-        const isInImport = currentLine.includes('import ') || currentLine.includes('from ');
-
-        const indentLevel = (currentLine.match(/^\s*/)?.[0]?.length || 0) / 2;
-
-        return {
-            isInFunction,
-            isInClass,
-            isInImport,
-            indentLevel,
-        };
     }
 }
 

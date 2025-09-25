@@ -35,10 +35,7 @@ export class WebLLMProvider {
       { type: "module" }
     );
 
-    this.engine = await webllm.CreateWebWorkerMLCEngine(worker, {
-      model: this.config.model,
-      // You can prewarm / trust remote URL here if needed
-    });
+    this.engine = await webllm.CreateWebWorkerMLCEngine(worker, this.config.model);
   }
 
   async generate(

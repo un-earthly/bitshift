@@ -25,10 +25,7 @@ fn generate_local_title(messages: &[FrontendMessage]) -> String {
         .unwrap_or("Untitled Chat");
 
     // Take up to 6 words, strip punctuation, cap length ~50 chars
-    let words: Vec<&str> = base
-        .split_whitespace()
-        .take(6)
-        .collect();
+    let words: Vec<&str> = base.split_whitespace().take(6).collect();
     let mut title = words.join(" ");
     title = title.trim_matches('"').trim_matches('.').to_string();
     if title.is_empty() {

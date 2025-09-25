@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import {
   Panel,
   PanelGroup,
@@ -10,12 +10,11 @@ import { EditorLayout } from './components/EditorLayout';
 import { FileTreeContainer } from './components/FileTreeContainer';
 import { useContextKeys } from './commands/contextKeys';
 import { Toaster } from 'sonner';
-import { ProjectInitDialog } from './components/ProjectInitDialog';
 import './App.css';
 import { useEditorStore } from './store/editorStore';
 
 const App: React.FC = () => {
-  const [showInitDialog, setShowInitDialog] = useState(true);
+  // const [showInitDialog, setShowInitDialog] = useState(true);
 
   const { isChatVisible, setIsChatVisible } = useEditorStore()
   const setContext = useContextKeys(state => state.setContext);

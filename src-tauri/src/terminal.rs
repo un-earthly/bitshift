@@ -43,7 +43,10 @@ pub fn start_pty(id: String, app_handle: AppHandle) -> Result<(), String> {
         let mut ptys = state.ptys.lock().unwrap();
         if ptys.contains_key(&id) {
             ptys.remove(&id);
-            println!("[start_pty] Cleaned up existing PTY session for terminal {}", id);
+            println!(
+                "[start_pty] Cleaned up existing PTY session for terminal {}",
+                id
+            );
         }
     }
 
@@ -74,39 +77,27 @@ pub fn start_pty(id: String, app_handle: AppHandle) -> Result<(), String> {
         format!("Failed to get current dir: {}", e)
     })?);
 
-    let child = pty_pair
-        .slave
-        .spawn_command(cmd)
-        .map_err(|e| {
-            println!("[start_pty] Failed to spawn command: {}", e);
-            format!("Failed to spawn command: {}", e)
-        })?;
+    let child = pty_pair.slave.spawn_command(cmd).map_err(|e| {
+        println!("[start_pty] Failed to spawn command: {}", e);
+        format!("Failed to spawn command: {}", e)
+    })?;
 
     println!("[start_pty] Shell spawned successfully for terminal {}", id);
 
-    let reader = pty_pair
-        .master
-        .try_clone_reader()
-        .map_err(|e| {
-            println!("[start_pty] Failed to clone reader: {}", e);
-            format!("Failed to clone reader: {}", e)
-        })?;
+    let reader = pty_pair.master.try_clone_reader().map_err(|e| {
+        println!("[start_pty] Failed to clone reader: {}", e);
+        format!("Failed to clone reader: {}", e)
+    })?;
 
-    let mut reader_for_thread = pty_pair
-        .master
-        .try_clone_reader()
-        .map_err(|e| {
-            println!("[start_pty] Failed to clone reader for thread: {}", e);
-            format!("Failed to clone reader for thread: {}", e)
-        })?;
+    let mut reader_for_thread = pty_pair.master.try_clone_reader().map_err(|e| {
+        println!("[start_pty] Failed to clone reader for thread: {}", e);
+        format!("Failed to clone reader for thread: {}", e)
+    })?;
 
-    let writer = pty_pair
-        .master
-        .take_writer()
-        .map_err(|e| {
-            println!("[start_pty] Failed to take writer: {}", e);
-            format!("Failed to take writer: {}", e)
-        })?;
+    let writer = pty_pair.master.take_writer().map_err(|e| {
+        println!("[start_pty] Failed to take writer: {}", e);
+        format!("Failed to take writer: {}", e)
+    })?;
 
     let master = pty_pair;
 
@@ -118,12 +109,10 @@ pub fn start_pty(id: String, app_handle: AppHandle) -> Result<(), String> {
     println!("[start_pty] PTY inserted into state for terminal {}", id);
 
     // Emit pty_ready event
-    app_handle
-        .emit("pty_ready", &id)
-        .map_err(|e| {
-            println!("[start_pty] Failed to emit pty_ready event: {}", e);
-            format!("Failed to emit pty_ready event: {}", e)
-        })?;
+    app_handle.emit("pty_ready", &id).map_err(|e| {
+        println!("[start_pty] Failed to emit pty_ready event: {}", e);
+        format!("Failed to emit pty_ready event: {}", e)
+    })?;
 
     let app_handle_clone = app_handle.clone();
     let id_clone = id.clone();
@@ -131,7 +120,10 @@ pub fn start_pty(id: String, app_handle: AppHandle) -> Result<(), String> {
         let mut buffer = [0; 1024];
         let mut previous_output = String::new();
 
-        println!("[reader_thread] Starting PTY reader loop for terminal {}", id_clone);
+        println!(
+            "[reader_thread] Starting PTY reader loop for terminal {}",
+            id_clone
+        );
         loop {
             match reader_for_thread.read(&mut buffer) {
                 Ok(n) if n > 0 => {
@@ -167,7 +159,10 @@ pub fn start_pty(id: String, app_handle: AppHandle) -> Result<(), String> {
         // Clean up PTY state when the thread exits
         if let Ok(mut ptys) = app_handle_clone.state::<PtyState>().ptys.lock() {
             if ptys.remove(&id_clone).is_some() {
-                println!("[reader_thread] Cleaned up PTY state for terminal {}", id_clone);
+                println!(
+                    "[reader_thread] Cleaned up PTY state for terminal {}",
+                    id_clone
+                );
             }
         }
     });

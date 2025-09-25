@@ -47,7 +47,9 @@ pub async fn search_web_for_tech_stack(
             updated_stack.push("Django".to_string());
         } else if language == "javascript"
             && text.contains("typescript")
-            && !updated_stack.iter().any(|t| t.to_lowercase() == "typescript")
+            && !updated_stack
+                .iter()
+                .any(|t| t.to_lowercase() == "typescript")
         {
             updated_stack.push("TypeScript".to_string());
         } else if language == "java"
