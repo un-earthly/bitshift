@@ -14,63 +14,31 @@ pub struct ChatSession {
     pub title: String,
 }
 
-// Function to generate a title using the LLM
-async fn generate_title_with_llm(messages: &[FrontendMessage]) -> Result<String, String> {
-    // Create a prompt for title generation
-    let context = messages
+// Lightweight local title generator to avoid network/LLM dependency
+fn generate_local_title(messages: &[FrontendMessage]) -> String {
+    // Prefer first user message; fallback to first assistant
+    let base = messages
         .iter()
-        .take(3) // Take first 3 messages for context
-        .map(|msg| format!("{}: {}", msg.role, msg.content))
-        .collect::<Vec<_>>()
-        .join("\n");
+        .find(|m| m.role == "user")
+        .or_else(|| messages.get(0))
+        .map(|m| m.content.trim())
+        .unwrap_or("Untitled Chat");
 
-    let prompt = format!(
-        "Based on this conversation, generate a concise and descriptive title (max 6 words):\n\n{}",
-        context
-    );
-
-    // Use the same LLM service that handles chat to generate the title
-    let response = fetch_llm_response(&prompt).await?;
-
-    // Clean up the response
-    let title = response
-        .trim()
-        .trim_matches('"')
-        .trim_matches('.')
-        .to_string();
-
-    Ok(if title.len() > 50 {
-        title[..47].to_string() + "..."
-    } else {
-        title
-    })
-}
-
-async fn fetch_llm_response(prompt: &str) -> Result<String, String> {
-    // Example using HTTP client to communicate with local llama.cpp server
-    let client = reqwest::Client::new();
-    let response = client
-        .post("http://127.0.0.1:8080/v1/chat/completions")
-        .json(&serde_json::json!({
-            "messages": [
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-            "max_tokens": 20,
-            "temperature": 0.7
-        }))
-        .send()
-        .await
-        .map_err(|e| e.to_string())?;
-
-    let json: serde_json::Value = response.json().await.map_err(|e| e.to_string())?;
-
-    Ok(json["choices"][0]["message"]["content"]
-        .as_str()
-        .unwrap_or("Untitled Chat")
-        .to_string())
+    // Take up to 6 words, strip punctuation, cap length ~50 chars
+    let words: Vec<&str> = base
+        .split_whitespace()
+        .take(6)
+        .collect();
+    let mut title = words.join(" ");
+    title = title.trim_matches('"').trim_matches('.').to_string();
+    if title.is_empty() {
+        title = "Untitled Chat".to_string();
+    }
+    if title.len() > 50 {
+        title.truncate(47);
+        title.push_str("...");
+    }
+    title
 }
 
 #[tauri::command]
@@ -101,10 +69,9 @@ pub async fn insert_message(
             },
         ];
 
-        // Generate and save the AI-created title
-        if let Ok(title) = generate_title_with_llm(&messages).await {
-            db.update_session_title(&session_id, &title)?;
-        }
+        // Generate and save a local title (no network)
+        let title = generate_local_title(&messages);
+        db.update_session_title(&session_id, &title)?;
     }
 
     Ok(())
